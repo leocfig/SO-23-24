@@ -4,15 +4,15 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <stdlib.h>
 
 #include "fileOperations.h"
 
 
 // Dúvidas:
 // - Temos de printar o erro na linha de comandos com o write ou não é suposto printar mesmo nada na linha de comandos?
-// - Temos de fazer protóticos?
-// - Podemos criar ficheiros novos?
-// - Podemos usar o errMsg??? Se sim não tinhamos de fazer o write?
+// - Podemos criar ficheiros novos? -> Então temos de mudar a makefile?
+// - Podemos usar o errMsg??? Se sim, não tinhamos de fazer o write?
 // - Quando um dos ficheiros não abre, é suposto além de printar o erro, fazer o quê?
 // - Código repetido???
 
@@ -36,11 +36,12 @@ int openFile(const char *path, int flags) {
 
   int fd = open(path, flags);
   if (fd < 0){
-    const char* error_message = strcat(strerror(errno), "\n");
-    error_message = strcat("open error: ", error_message);
-    size_t error_message_length = strlen(error_message);
+    char* error_message = strcat(strerror(errno), "\n");
+    char* error = "open error: ";
+    strcat(error, error_message);
+    size_t error_message_length = strlen(error);
 
-    write(STDERR_FILENO, error_message, error_message_length);
+    write(STDERR_FILENO, error, error_message_length);
     return -1;
   }
   return fd;
@@ -54,8 +55,8 @@ int get_size_directory(const char *dirpath) {
   dirp = opendir(dirpath);
 
   if (dirp == NULL) {
-    errMsg("opendir failed on '%s'", dirpath);
-    return;
+    //errMsg("opendir failed on '%s'", dirpath);
+    return -1;
   }
   
   int count = 0;
@@ -81,16 +82,16 @@ int *readDirectory(const char *dirpath) {
   dirp = opendir(dirpath);
 
   if (dirp == NULL) {
-    errMsg("opendir failed on '%s'", dirpath);
-    return;
+    //errMsg("opendir failed on '%s'", dirpath);
+    return NULL;
   }
 
-  int* fileDescriptors = malloc(get_size_directory(dirpath) * sizeof(int));
+  int* fileDescriptors = malloc((size_t) get_size_directory(dirpath) * sizeof(int));
 
   // Check if memory allocation is successful
   if (fileDescriptors == NULL) {
       write(STDERR_FILENO, "Error allocating memory\n", ERROR_MEMORY);
-      return -1;
+      return NULL;
   }
 
   for (;;) {
@@ -102,7 +103,7 @@ int *readDirectory(const char *dirpath) {
       break;
     if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
         !has_extension(dp->d_name, ".jobs"))
-      continue; /* Skips . and .. and files with other extensions other than ".job" */
+      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
 
     fileDescriptors[i++] = openFile(dp->d_name, O_RDONLY);
   }
