@@ -11,11 +11,7 @@
 
 
 // Dúvidas:
-// - Temos de printar o erro na linha de comandos com o write ou não é suposto printar mesmo nada na linha de comandos?
-// - Podemos criar ficheiros novos? -> Então temos de mudar a makefile?
-// - Podemos usar o errMsg??? Se sim, não tinhamos de fazer o write?
-// - Quando um dos ficheiros não abre, é suposto além de printar o erro, fazer o quê?
-// - Código repetido???
+// - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -33,10 +29,23 @@ int has_extension(const char *filename, const char *extension) {
 }
 
 
+char *change_extension(char *filename, const char *extension) {
+
+  char *lastDot = strrchr(filename, '.');
+  long int index = lastDot - filename + 1; // to start after the dot
+  int extension_size = (int) strlen(extension);
+  int i,j;
+
+  for (i = 0,j = (int) index; i < extension_size; i++, j++) {
+    filename[j] = extension[i];
+  }
+  filename[j] = '\0';
+  return filename;
+}
+
+
 int openFile(const char *path, int flags) {
 
-  printf("%s\n", path);
-  fflush(stdout);
   int fd = open(path, flags);
   if (fd < 0){
     char* e = strerror(errno);
@@ -49,6 +58,25 @@ int openFile(const char *path, int flags) {
     return -1;
   }
   return fd;
+}
+
+
+void write_inFile(int fdOut, const char *buffer) {
+
+  int len = strlen(buffer);
+  
+  int done = 0;
+  while (len > 0) {
+    int bytes_written = write(fdOut, buffer + done, len);
+
+    if (bytes_written < 0){
+      fprintf(stderr, "write error: %s\n", strerror(errno));
+    }
+
+    /* might not have managed to write all, len becomes what remains */
+    len -= bytes_written;
+    done += bytes_written;
+  }
 }
 
 

@@ -35,10 +35,7 @@ int main(int argc, char *argv[]) {
   }
 
   const char *dirpath = argv[1];
-  printf("%s\n", dirpath);
-  fflush(stdout);
-  //int *fileDescriptors = readDirectory(dirpath);
-  //int size_directory = get_size_directory(dirpath);
+  
   DIR *dirp;
   struct dirent *dp;
   dirp = opendir(dirpath);
@@ -48,23 +45,37 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *auxDirpath = argv[1];
+  size_t sizePath = strlen(dirpath);
+  
   for (;;) {
     errno = 0; /* To distinguish error from end-of-directory */
     dp = readdir(dirp);
-
-
-
-    // ALOCAR UM BUFFER PARA OS NOMES DOS FICHEIROS 
-    // NO FIM DAR FREE DO NOME 
-
+    
     if (dp == NULL)
-      break;
-    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
-        !has_extension(dp->d_name, ".jobs"))
-      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
+          break;
 
-    int fileDescriptor = openFile(strcat(auxDirpath, dp->d_name), O_RDONLY);
+    // +2 for ...
+    char *filePath = (char *)malloc((sizePath + strlen(dp->d_name) + 2)* sizeof(char));
+
+    if (filePath == NULL) {
+      fprintf(stderr, "Memory allocation for filePath failed\n");
+      return 1;
+    }
+
+    strcpy(filePath, dirpath);
+    strcat(filePath, "/");
+    
+    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
+        !has_extension(dp->d_name, ".jobs")) {
+      free(filePath);
+      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
+    }  
+
+    int fileDescriptorIn = openFile(strcat(filePath, dp->d_name), O_RDONLY);
+    int fileDescriptorOut = openFile(change_extension(filePath, "out"), O_CREAT | O_WRONLY);
+    
+    free(filePath);
+
     int endOfFile =1;
 
     while (endOfFile) {
@@ -72,9 +83,9 @@ int main(int argc, char *argv[]) {
       size_t num_rows, num_columns, num_coords;
       size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
 
-      switch (get_next(fileDescriptor)) {
+      switch (get_next(fileDescriptorIn)) {
         case CMD_CREATE:
-          if (parse_create(fileDescriptor, &event_id, &num_rows, &num_columns) != 0) {
+          if (parse_create(fileDescriptorIn, &event_id, &num_rows, &num_columns) != 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
@@ -86,7 +97,7 @@ int main(int argc, char *argv[]) {
           break;
 
         case CMD_RESERVE:
-          num_coords = parse_reserve(fileDescriptor, MAX_RESERVATION_SIZE, &event_id, xs, ys);
+          num_coords = parse_reserve(fileDescriptorIn, MAX_RESERVATION_SIZE, &event_id, xs, ys);
 
           if (num_coords == 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
@@ -100,27 +111,25 @@ int main(int argc, char *argv[]) {
           break;
 
         case CMD_SHOW:
-          if (parse_show(fileDescriptor, &event_id) != 0) {
+          if (parse_show(fileDescriptorIn, &event_id) != 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
 
-          if (ems_show(event_id)) {
+          if (ems_show(fileDescriptorOut, event_id)) {
             fprintf(stderr, "Failed to show event\n");
           }
-          fprintf(stdout, "fim show\n");
-          fflush(stdout);
           break;
 
         case CMD_LIST_EVENTS:
-          if (ems_list_events()) {
+          if (ems_list_events(fileDescriptorOut)) {
             fprintf(stderr, "Failed to list events\n");
           }
 
           break;
 
         case CMD_WAIT:
-          if (parse_wait(fileDescriptor, &delay, NULL) == -1) {  // thread_id is not implemented
+          if (parse_wait(fileDescriptorIn, &delay, NULL) == -1) {  // thread_id is not implemented
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
@@ -154,14 +163,12 @@ int main(int argc, char *argv[]) {
           break;
 
         case EOC:
-          close(fileDescriptor);
+          close(fileDescriptorIn);
+          close(fileDescriptorOut);
           endOfFile=0;
           break;
       }
     }
-    fprintf(stdout, "fim file\n");
-    fflush(stdout);
-    close(fileDescriptor);
   }
   closedir(dirp);
   ems_terminate();

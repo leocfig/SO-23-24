@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "eventlist.h"
+#include "fileOperations.h"
 
 static struct EventList* event_list = NULL;
 static unsigned int state_access_delay_ms = 0;
@@ -156,7 +157,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys)
   return 0;
 }
 
-int ems_show(unsigned int event_id) {
+int ems_show(int fdOut, unsigned int event_id) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -169,23 +170,30 @@ int ems_show(unsigned int event_id) {
     return 1;
   }
 
+  // por comentário ...
+  unsigned int* row = (unsigned int*)malloc(((event->cols * 2) + 1)* sizeof(unsigned int));
+
   for (size_t i = 1; i <= event->rows; i++) {
+    int k = 0;
     for (size_t j = 1; j <= event->cols; j++) {
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      printf("%u", *seat);
+
+      row[k++] = *seat;
 
       if (j < event->cols) {
-        printf(" ");
+        row[k++] = ' ';
       }
     }
-
-    printf("\n");
+    row[k++] = '\n';
+    row[k] = '\0';
+    write_inFile(fdOut, row); //problema é termos um "array" de ints e a funcao receber char
   }
 
+  free(row);
   return 0;
 }
 
-int ems_list_events() {
+int ems_list_events(int fdOut) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -202,7 +210,6 @@ int ems_list_events() {
     printf("%u\n", (current->event)->id);
     current = current->next;
   }
-
   return 0;
 }
 
