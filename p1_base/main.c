@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stddef.h>
+#include <fcntl.h>
+#include <string.h>
 
 #include "fileOperations.h"
 #include "operations.h"
@@ -30,21 +35,46 @@ int main(int argc, char *argv[]) {
   }
 
   const char *dirpath = argv[1];
-  int *fileDescriptors = readDirectory(dirpath);
-  int size_directory = get_size_directory(dirpath);
+  printf("%s\n", dirpath);
+  fflush(stdout);
+  //int *fileDescriptors = readDirectory(dirpath);
+  //int size_directory = get_size_directory(dirpath);
+  DIR *dirp;
+  struct dirent *dp;
+  dirp = opendir(dirpath);
 
-  for (int i = 0; i < size_directory; i++) {
-    while (1) {
+  if (dirp == NULL){
+    fprintf(stderr, "opendir failed on: %s\n", dirpath);
+    return 1;
+  }
+
+  char *auxDirpath = argv[1];
+  for (;;) {
+    errno = 0; /* To distinguish error from end-of-directory */
+    dp = readdir(dirp);
+
+
+
+    // ALOCAR UM BUFFER PARA OS NOMES DOS FICHEIROS 
+    // NO FIM DAR FREE DO NOME 
+
+    if (dp == NULL)
+      break;
+    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
+        !has_extension(dp->d_name, ".jobs"))
+      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
+
+    int fileDescriptor = openFile(strcat(auxDirpath, dp->d_name), O_RDONLY);
+    int endOfFile =1;
+
+    while (endOfFile) {
       unsigned int event_id, delay;
       size_t num_rows, num_columns, num_coords;
       size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
 
-      printf("> ");
-      fflush(stdout);
-
-      switch (get_next(fileDescriptors[i])) {
+      switch (get_next(fileDescriptor)) {
         case CMD_CREATE:
-          if (parse_create(fileDescriptors[i], &event_id, &num_rows, &num_columns) != 0) {
+          if (parse_create(fileDescriptor, &event_id, &num_rows, &num_columns) != 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
@@ -56,7 +86,7 @@ int main(int argc, char *argv[]) {
           break;
 
         case CMD_RESERVE:
-          num_coords = parse_reserve(fileDescriptors[i], MAX_RESERVATION_SIZE, &event_id, xs, ys);
+          num_coords = parse_reserve(fileDescriptor, MAX_RESERVATION_SIZE, &event_id, xs, ys);
 
           if (num_coords == 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
@@ -70,7 +100,7 @@ int main(int argc, char *argv[]) {
           break;
 
         case CMD_SHOW:
-          if (parse_show(fileDescriptors[i], &event_id) != 0) {
+          if (parse_show(fileDescriptor, &event_id) != 0) {
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
@@ -78,7 +108,8 @@ int main(int argc, char *argv[]) {
           if (ems_show(event_id)) {
             fprintf(stderr, "Failed to show event\n");
           }
-
+          fprintf(stdout, "fim show\n");
+          fflush(stdout);
           break;
 
         case CMD_LIST_EVENTS:
@@ -89,7 +120,7 @@ int main(int argc, char *argv[]) {
           break;
 
         case CMD_WAIT:
-          if (parse_wait(fileDescriptors[i], &delay, NULL) == -1) {  // thread_id is not implemented
+          if (parse_wait(fileDescriptor, &delay, NULL) == -1) {  // thread_id is not implemented
             fprintf(stderr, "Invalid command. See HELP for usage\n");
             continue;
           }
@@ -123,10 +154,16 @@ int main(int argc, char *argv[]) {
           break;
 
         case EOC:
-          ems_terminate();
-          return 0;
+          close(fileDescriptor);
+          endOfFile=0;
+          break;
       }
     }
+    fprintf(stdout, "fim file\n");
+    fflush(stdout);
+    close(fileDescriptor);
   }
-  free(fileDescriptors);
+  closedir(dirp);
+  ems_terminate();
+  return 0;
 }

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "fileOperations.h"
 
@@ -34,11 +35,14 @@ int has_extension(const char *filename, const char *extension) {
 
 int openFile(const char *path, int flags) {
 
+  printf("%s\n", path);
+  fflush(stdout);
   int fd = open(path, flags);
   if (fd < 0){
-    char* error_message = strcat(strerror(errno), "\n");
+    char* e = strerror(errno);
+    strcat(e, "\n");
     char* error = "open error: ";
-    strcat(error, error_message);
+    strcat(error, e);
     size_t error_message_length = strlen(error);
 
     write(STDERR_FILENO, error, error_message_length);
@@ -74,39 +78,4 @@ int get_size_directory(const char *dirpath) {
   return count;
 }
 
-
-int *readDirectory(const char *dirpath) {
-
-  DIR *dirp;
-  struct dirent *dp;
-  dirp = opendir(dirpath);
-
-  if (dirp == NULL) {
-    //errMsg("opendir failed on '%s'", dirpath);
-    return NULL;
-  }
-
-  int* fileDescriptors = malloc((size_t) get_size_directory(dirpath) * sizeof(int));
-
-  // Check if memory allocation is successful
-  if (fileDescriptors == NULL) {
-      write(STDERR_FILENO, "Error allocating memory\n", ERROR_MEMORY);
-      return NULL;
-  }
-
-  for (;;) {
-    errno = 0; /* To distinguish error from end-of-directory */
-    dp = readdir(dirp);
-    int i = 0;
-
-    if (dp == NULL)
-      break;
-    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
-        !has_extension(dp->d_name, ".jobs"))
-      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
-
-    fileDescriptors[i++] = openFile(dp->d_name, O_RDONLY);
-  }
-  return fileDescriptors;
-}
 
