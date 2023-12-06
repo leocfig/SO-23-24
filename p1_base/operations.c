@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 #include "eventlist.h"
@@ -172,40 +171,32 @@ int ems_show(int fdOut, unsigned int event_id) {
   }
 
   size_t row_size = event->cols; // pôr comentário ...
-  char *char_buffer = (char *)malloc((row_size * (UNS_INT_SIZE + 1) + 1) * sizeof(char));
-  //unsigned int *row = (unsigned int*)malloc(row_size * sizeof(unsigned int));
+  unsigned int *row = (unsigned int*)malloc(row_size * sizeof(unsigned int));
 
-  if (char_buffer == NULL) {
-    fprintf(stderr, "Memory allocation for buffer failed\n");
-    return 1;
+  if (row == NULL) {
+    fprintf(stderr, "Memory allocation for row failed\n");
+    return 1; // aqui tiramos ou deixamos ??? -> maybe deixar pq já há casos que retorna 1?
   }
 
-  char numStr[UNS_INT_SIZE + 1]; // +1 for the '\0'
-
   for (size_t i = 1; i <= event->rows; i++) {
-    for (size_t j = 1; j <= event->cols; j++) {
+    for (size_t j = 1, k = 0; j <= event->cols; j++) {
 
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      snprintf(numStr, sizeof(numStr), "%ls", seat);  // Convert unsigned int to string
-      strcat(char_buffer, numStr);
-      
-      //row[k++] = *seat;
-      if (j < event->cols) {
-        strcat(char_buffer, " ");
-      }
-      else {
-        strcat(char_buffer, "\n\0");
-      }
+      row[k++] = *seat;
+      //if (j < event->cols) {
+      //  row[k++] = ' ';
+      //}
     }
     //row[k++] = '\n';
     //row[k] = '\0';
 
-    //char *buffer = buffer_to_string(row, row_size);
-    write_inFile(fdOut, char_buffer);
-    //free(buffer);
+    print_unsigned_int_array(row, row_size);
+    char *buffer = buffer_to_string(row, row_size);
+    write_inFile(fdOut, buffer);
+    free(buffer);
   }
 
-  free(char_buffer);
+  free(row);
   return 0;
 }
 

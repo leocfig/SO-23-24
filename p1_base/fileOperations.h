@@ -8,6 +8,8 @@
 #define ERROR_MEMORY 25
 
 
+void print_unsigned_int_array(unsigned int *arr, size_t size);
+
 int has_extension(const char *filename, const char *extension);
 
 char *change_extension(char *filename, const char *extension);

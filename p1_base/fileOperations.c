@@ -17,6 +17,19 @@
 // - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
 
 
+void print_unsigned_int_array(unsigned int *arr, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+        printf("%u", arr[i]);
+
+        if (i < size - 1) {
+            printf(" ");  // Add a space between elements
+        }
+    }
+
+    printf("\n");  // Add a newline at the end
+}
+
+
 int has_extension(const char *filename, const char *extension) {
 
   size_t filename_length = strlen(filename);
@@ -49,21 +62,37 @@ char *change_extension(char *filename, const char *extension) { // checkar isto!
 // por uma verificacao a ver se snprintf falha?
 
 char *buffer_to_string(const unsigned int *buffer, size_t buffer_size) {
-
-  char *char_buffer = (char *)malloc((buffer_size * (UNS_INT_SIZE + 1) + 1) * sizeof(char));
+  
+  size_t size = (buffer_size * (UNS_INT_SIZE + 1) + 1);
+  char *char_buffer = (char *)malloc(size * sizeof(char));
 
   if (char_buffer == NULL) {
-    fprintf(stderr, "Memory allocation for row failed\n");
-    return NULL; // aqui tiramos ou deixamos ???
+    fprintf(stderr, "Memory allocation for buffer failed\n");
+    return NULL;
   }
 
-  size_t len = (size_t)snprintf(char_buffer, buffer_size, "%u", buffer[0]);
-  for (size_t i = 1; i < buffer_size; i++) {
-      len += (size_t)snprintf(char_buffer + len, buffer_size - len, " %u", buffer[i]);
+  size_t len = (size_t)snprintf(char_buffer, size, "%u", buffer[0]);
+
+  if (len >= size) {
+    fprintf(stderr, "Error in snprintf\n");
+    free(char_buffer);
+    return NULL;
   }
-  snprintf(char_buffer + len, buffer_size - len, "\n");
+
+  for (size_t i = 1; i < buffer_size; i++) {
+      len += (size_t)snprintf(char_buffer + len, size - len, " %u", buffer[i]);
+
+      if (len >= size) {
+        fprintf(stderr, "Error in snprintf\n");
+        free(char_buffer);
+        return NULL;
+      }
+  }
+
+  snprintf(char_buffer + len, size - len, "\n");
   return char_buffer;
 }
+
 
 
 int openFile(const char *path, int flags, mode_t mode) {
