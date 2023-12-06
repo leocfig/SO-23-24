@@ -183,15 +183,9 @@ int ems_show(int fdOut, unsigned int event_id) {
 
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
       row[k++] = *seat;
-      //if (j < event->cols) {
-      //  row[k++] = ' ';
-      //}
     }
-    //row[k++] = '\n';
-    //row[k] = '\0';
 
-    print_unsigned_int_array(row, row_size);
-    char *buffer = buffer_to_string(row, row_size);
+    char *buffer = buffer_to_string(row, row_size, SHOW_KEY);
     write_inFile(fdOut, buffer);
     free(buffer);
   }
@@ -207,14 +201,19 @@ int ems_list_events(int fdOut) {
   }
 
   if (event_list->head == NULL) {
-    printf("No events\n");
+    write_inFile(fdOut, "No events\n");
     return 0;
   }
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
-    printf("Event: ");
-    printf("%u\n", (current->event)->id);
+    write_inFile(fdOut, "Event: ");
+    unsigned int *event_ID = (unsigned int*)malloc(sizeof(unsigned int) + 1);
+    event_ID[0] = (current->event)->id;
+    char *buffer = buffer_to_string(event_ID, 1, LIST_KEY);
+    write_inFile(fdOut, buffer);
+    free(buffer);
+    free(event_ID);
     current = current->next;
   }
   fdOut++;

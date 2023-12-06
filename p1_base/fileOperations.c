@@ -13,21 +13,7 @@
 
 // Dúvidas:
 // - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
-// - Linha buufer_to_string
 // - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
-
-
-void print_unsigned_int_array(unsigned int *arr, size_t size) {
-    for (size_t i = 0; i < size; i++) {
-        printf("%u", arr[i]);
-
-        if (i < size - 1) {
-            printf(" ");  // Add a space between elements
-        }
-    }
-
-    printf("\n");  // Add a newline at the end
-}
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -59,9 +45,8 @@ char *change_extension(char *filename, const char *extension) { // checkar isto!
   return filename;
 }
 
-// por uma verificacao a ver se snprintf falha?
 
-char *buffer_to_string(const unsigned int *buffer, size_t buffer_size) {
+char *buffer_to_string(const unsigned int *buffer, size_t buffer_size, int function_called) {
   
   size_t size = (buffer_size * (UNS_INT_SIZE + 1) + 1);
   char *char_buffer = (char *)malloc(size * sizeof(char));
@@ -79,7 +64,8 @@ char *buffer_to_string(const unsigned int *buffer, size_t buffer_size) {
     return NULL;
   }
 
-  for (size_t i = 1; i < buffer_size; i++) {
+  if (function_called == 0) {
+    for (size_t i = 1; i < buffer_size; i++) {
       len += (size_t)snprintf(char_buffer + len, size - len, " %u", buffer[i]);
 
       if (len >= size) {
@@ -87,12 +73,12 @@ char *buffer_to_string(const unsigned int *buffer, size_t buffer_size) {
         free(char_buffer);
         return NULL;
       }
+    }
   }
 
   snprintf(char_buffer + len, size - len, "\n");
   return char_buffer;
 }
-
 
 
 int openFile(const char *path, int flags, mode_t mode) {
