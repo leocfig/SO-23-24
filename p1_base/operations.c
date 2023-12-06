@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "eventlist.h"
@@ -170,26 +171,41 @@ int ems_show(int fdOut, unsigned int event_id) {
     return 1;
   }
 
-  // por comentário ...
-  unsigned int* row = (unsigned int*)malloc(((event->cols * 2) + 1)* sizeof(unsigned int));
+  size_t row_size = event->cols; // pôr comentário ...
+  char *char_buffer = (char *)malloc((row_size * (UNS_INT_SIZE + 1) + 1) * sizeof(char));
+  //unsigned int *row = (unsigned int*)malloc(row_size * sizeof(unsigned int));
 
-  for (size_t i = 1; i <= event->rows; i++) {
-    int k = 0;
-    for (size_t j = 1; j <= event->cols; j++) {
-      unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-
-      row[k++] = *seat;
-
-      if (j < event->cols) {
-        row[k++] = ' ';
-      }
-    }
-    row[k++] = '\n';
-    row[k] = '\0';
-    write_inFile(fdOut, row); //problema é termos um "array" de ints e a funcao receber char
+  if (char_buffer == NULL) {
+    fprintf(stderr, "Memory allocation for buffer failed\n");
+    return 1;
   }
 
-  free(row);
+  char numStr[UNS_INT_SIZE + 1]; // +1 for the '\0'
+
+  for (size_t i = 1; i <= event->rows; i++) {
+    for (size_t j = 1; j <= event->cols; j++) {
+
+      unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
+      snprintf(numStr, sizeof(numStr), "%ls", seat);  // Convert unsigned int to string
+      strcat(char_buffer, numStr);
+      
+      //row[k++] = *seat;
+      if (j < event->cols) {
+        strcat(char_buffer, " ");
+      }
+      else {
+        strcat(char_buffer, "\n\0");
+      }
+    }
+    //row[k++] = '\n';
+    //row[k] = '\0';
+
+    //char *buffer = buffer_to_string(row, row_size);
+    write_inFile(fdOut, char_buffer);
+    //free(buffer);
+  }
+
+  free(char_buffer);
   return 0;
 }
 
@@ -210,6 +226,7 @@ int ems_list_events(int fdOut) {
     printf("%u\n", (current->event)->id);
     current = current->next;
   }
+  fdOut++;
   return 0;
 }
 

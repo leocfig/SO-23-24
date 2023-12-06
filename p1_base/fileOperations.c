@@ -6,12 +6,15 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
 
 #include "fileOperations.h"
 
 
 // Dúvidas:
 // - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
+// - Linha buufer_to_string
+// - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -29,7 +32,7 @@ int has_extension(const char *filename, const char *extension) {
 }
 
 
-char *change_extension(char *filename, const char *extension) {
+char *change_extension(char *filename, const char *extension) { // checkar isto!!!
 
   char *lastDot = strrchr(filename, '.');
   long int index = lastDot - filename + 1; // to start after the dot
@@ -43,19 +46,32 @@ char *change_extension(char *filename, const char *extension) {
   return filename;
 }
 
+// por uma verificacao a ver se snprintf falha?
 
-int openFile(const char *path, int flags) {
+char *buffer_to_string(const unsigned int *buffer, size_t buffer_size) {
 
-  int fd = open(path, flags);
+  char *char_buffer = (char *)malloc((buffer_size * (UNS_INT_SIZE + 1) + 1) * sizeof(char));
+
+  if (char_buffer == NULL) {
+    fprintf(stderr, "Memory allocation for row failed\n");
+    return NULL; // aqui tiramos ou deixamos ???
+  }
+
+  size_t len = (size_t)snprintf(char_buffer, buffer_size, "%u", buffer[0]);
+  for (size_t i = 1; i < buffer_size; i++) {
+      len += (size_t)snprintf(char_buffer + len, buffer_size - len, " %u", buffer[i]);
+  }
+  snprintf(char_buffer + len, buffer_size - len, "\n");
+  return char_buffer;
+}
+
+
+int openFile(const char *path, int flags, mode_t mode) {
+
+  int fd = open(path, flags, mode);
   if (fd < 0){
-    char* e = strerror(errno);
-    strcat(e, "\n");
-    char* error = "open error: ";
-    strcat(error, e);
-    size_t error_message_length = strlen(error);
-
-    write(STDERR_FILENO, error, error_message_length);
-    return -1;
+    fprintf(stderr, "open error: %s\n", strerror(errno));
+    // return -1; aqui não fazemos nada né? Porque o stor tinha dito que podiamos fazer o que quiséssemos
   }
   return fd;
 }
@@ -63,14 +79,15 @@ int openFile(const char *path, int flags) {
 
 void write_inFile(int fdOut, const char *buffer) {
 
-  int len = strlen(buffer);
+  ssize_t len = (ssize_t)strlen(buffer);
+  ssize_t done = 0;
   
-  int done = 0;
   while (len > 0) {
-    int bytes_written = write(fdOut, buffer + done, len);
+    ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
 
-    if (bytes_written < 0){
+    if (bytes_written < 0) {
       fprintf(stderr, "write error: %s\n", strerror(errno));
+      break;
     }
 
     /* might not have managed to write all, len becomes what remains */

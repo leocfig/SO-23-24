@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "fileOperations.h"
 #include "operations.h"
@@ -71,12 +72,13 @@ int main(int argc, char *argv[]) {
       continue; /* Skips . and .. and files with other extensions other than ".jobs" */
     }  
 
-    int fileDescriptorIn = openFile(strcat(filePath, dp->d_name), O_RDONLY);
-    int fileDescriptorOut = openFile(change_extension(filePath, "out"), O_CREAT | O_WRONLY);
+    int fileDescriptorIn = open(strcat(filePath, dp->d_name), O_RDONLY, NULL);
+    int fileDescriptorOut = openFile(change_extension(filePath, "out"), 
+                            O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
     
     free(filePath);
 
-    int endOfFile =1;
+    int endOfFile = 1;
 
     while (endOfFile) {
       unsigned int event_id, delay;
