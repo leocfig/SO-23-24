@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include "fileOperations.h"
 #include "operations.h"
@@ -36,7 +37,7 @@ int main(int argc, char *argv[]) {
   }
 
   const char *dirpath = argv[1];
-  //int max_proc = argv[2];
+  int max_proc = atoi(argv[2]);
   
   DIR *dirp;
   struct dirent *dp;
@@ -48,16 +49,63 @@ int main(int argc, char *argv[]) {
   }
 
   size_t sizePath = strlen(dirpath);
-  
-  for (;;) {
-    errno = 0; /* To distinguish error from end-of-directory */
-    dp = readdir(dirp);
-    
-    if (dp == NULL)
-          break;
+  pid_t pid;
+  int active_child_proc = 0;
+  int status;
 
-    // +2 for ...
-    char *filePath = (char *)malloc((sizePath + strlen(dp->d_name) + 2)* sizeof(char));
+  for (;;) {
+    
+    errno = 0;              // To distinguish error from end-of-directory
+
+    while (active_child_proc < max_proc) {
+
+      dp = readdir(dirp);
+      if (dp == NULL)
+        break;              // No more files in the directory
+
+      if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
+        !has_extension(dp->d_name, ".jobs")) {
+        /* Skips . and .. and files with other extensions other than ".jobs" */
+        continue;
+      }
+
+      pid = fork();
+      active_child_proc++;
+      
+      if (pid == -1) {
+        fprintf(stderr, "Fork failed\n");
+        exit(EXIT_FAILURE);
+      }
+
+      else if (pid == 0)    // if it's the child process
+        break;
+    }
+
+    if (active_child_proc == 0) {
+      break;
+    }
+
+    if (pid != 0) {  // if it's the parent process
+      pid = wait(&status);
+      active_child_proc--;
+
+      if (pid > 0) {  // the wait was successful
+        if (WIFEXITED(status)) {
+          printf("Child process %d exited with status %d\n", pid, WEXITSTATUS(status));
+        }
+        else {
+          printf("Child process %d didn't terminate normally\n", pid);
+        }
+      }
+      else if (pid == -1) {
+        fprintf(stderr, "Wait failed\n");
+        exit(EXIT_FAILURE);
+      }
+      continue;
+    }
+
+    // +2 for the "/" and the "\0"
+    char *filePath = (char *)malloc((sizePath + strlen(dp->d_name) + 2) * sizeof(char));
 
     if (filePath == NULL) {
       fprintf(stderr, "Memory allocation for filePath failed\n");
@@ -66,19 +114,12 @@ int main(int argc, char *argv[]) {
 
     strcpy(filePath, dirpath);
     strcat(filePath, "/");
-    
-    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
-        !has_extension(dp->d_name, ".jobs")) {
-      free(filePath);
-      continue; /* Skips . and .. and files with other extensions other than ".jobs" */
-    }  
 
     int fileDescriptorIn = open(strcat(filePath, dp->d_name), O_RDONLY, NULL);
     int fileDescriptorOut = openFile(change_extension(filePath, "out"), 
                             O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
     
     free(filePath);
-
     int endOfFile = 1;
 
     while (endOfFile) {
@@ -169,7 +210,8 @@ int main(int argc, char *argv[]) {
           close(fileDescriptorIn);
           close(fileDescriptorOut);
           endOfFile=0;
-          break;
+          exit(EXIT_SUCCESS);
+          //break; - inútil
       }
     }
   }

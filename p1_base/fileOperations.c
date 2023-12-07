@@ -14,6 +14,10 @@
 // Dúvidas:
 // - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
 // - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
+// - Erros
+// - Computadores dos labs
+// - Pergunta 34
+// - Aquilo de supormos que .jobs era menor que .out
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -64,7 +68,7 @@ char *buffer_to_string(const unsigned int *buffer, size_t buffer_size, int funct
     return NULL;
   }
 
-  if (function_called == 0) {
+  if (function_called == SHOW_KEY) {
     for (size_t i = 1; i < buffer_size; i++) {
       len += (size_t)snprintf(char_buffer + len, size - len, " %u", buffer[i]);
 
