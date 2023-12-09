@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h> //-------------------------------tirar
 
 #include "constants.h"
 
@@ -130,6 +131,7 @@ enum Command get_next(int fd) {
       return CMD_EMPTY;
 
     default:
+      printf("Char: %d\n", buf[0]);
       cleanup(fd);
       return CMD_INVALID;
   }

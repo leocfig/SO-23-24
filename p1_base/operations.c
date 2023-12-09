@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <threads.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "eventlist.h"
 #include "operations.h"
@@ -70,28 +71,22 @@ int ems_terminate() {
   return 0;
 }
 
-void* ems_create (void *arg) {
-  Create_args const *args = (Create_args const *)arg;
-
-  unsigned int event_id = args->event_id;
-  size_t num_rows = args->num_rows;
-  size_t num_cols = args->num_columns;
-
+int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    thrd_exit(1);
+    return 1;
   }
 
   if (get_event_with_delay(event_id) != NULL) {
     fprintf(stderr, "Event already exists\n");
-    thrd_exit(1);
+    return 1;
   }
 
   struct Event* event = malloc(sizeof(struct Event));
 
   if (event == NULL) {
     fprintf(stderr, "Error allocating memory for event\n");
-    thrd_exit(1);
+    return 1;
   }
 
   event->id = event_id;
@@ -103,7 +98,7 @@ void* ems_create (void *arg) {
   if (event->data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
     free(event);
-    thrd_exit(1);
+    return 1;
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
@@ -114,13 +109,13 @@ void* ems_create (void *arg) {
     fprintf(stderr, "Error appending event to list\n");
     free(event->data);
     free(event);
-    thrd_exit(1);
+    return 1;
   }
 
-  thrd_exit(0);
+  return 0;
 }
 
-int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys) {
+int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t mutex) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -132,6 +127,8 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
     fprintf(stderr, "Event not found\n");
     return 1;
   }
+
+  pthread_mutex_lock(&mutex);
 
   unsigned int reservation_id = ++event->reservations;
 
@@ -152,6 +149,8 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
 
     *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
   }
+
+  pthread_mutex_unlock(&mutex);
 
   // If the reservation was not successful, free the seats that were reserved.
   if (i < num_seats) {
@@ -224,7 +223,7 @@ int ems_list_events(int fdOut) {
     free(event_ID);
     current = current->next;
   }
-  fdOut++;
+  
   return 0;
 }
 
