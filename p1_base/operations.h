@@ -3,6 +3,19 @@
 
 #include <stddef.h>
 
+typedef struct{
+  unsigned int  event_id;
+  size_t num_rows;
+  size_t num_columns;
+} Create_args;
+
+//typedef struct{
+  //unsigned int event_id;
+  //size_t num_seats;
+  //size_t* xs;
+  //size_t* ys;
+//} Reserve_args;
+
 /// Initializes the EMS state.
 /// @param delay_ms State access delay in milliseconds.
 /// @return 0 if the EMS state was initialized successfully, 1 otherwise.
@@ -16,7 +29,7 @@ int ems_terminate();
 /// @param num_rows Number of rows of the event to be created.
 /// @param num_cols Number of columns of the event to be created.
 /// @return 0 if the event was created successfully, 1 otherwise.
-int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
+void* ems_create (void *arg);
 
 /// Creates a new reservation for the given event.
 /// @param event_id Id of the event to create a reservation for.
@@ -25,6 +38,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
 /// @param ys Array of columns of the seats to reserve.
 /// @return 0 if the reservation was created successfully, 1 otherwise.
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys);
+//void* ems_reserve(void *arg);
 
 /// Prints the given event.
 /// @param fd File descriptor to write in.

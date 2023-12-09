@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <threads.h>
 #include <time.h>
 
 #include "eventlist.h"
+#include "operations.h"
 #include "fileOperations.h"
 
 static struct EventList* event_list = NULL;
@@ -68,22 +70,28 @@ int ems_terminate() {
   return 0;
 }
 
-int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
+void* ems_create (void *arg) {
+  Create_args const *args = (Create_args const *)arg;
+
+  unsigned int event_id = args->event_id;
+  size_t num_rows = args->num_rows;
+  size_t num_cols = args->num_columns;
+
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
-    return 1;
+    thrd_exit(1);
   }
 
   if (get_event_with_delay(event_id) != NULL) {
     fprintf(stderr, "Event already exists\n");
-    return 1;
+    thrd_exit(1);
   }
 
   struct Event* event = malloc(sizeof(struct Event));
 
   if (event == NULL) {
     fprintf(stderr, "Error allocating memory for event\n");
-    return 1;
+    thrd_exit(1);
   }
 
   event->id = event_id;
@@ -95,7 +103,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   if (event->data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
     free(event);
-    return 1;
+    thrd_exit(1);
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
@@ -106,13 +114,13 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     fprintf(stderr, "Error appending event to list\n");
     free(event->data);
     free(event);
-    return 1;
+    thrd_exit(1);
   }
 
-  return 0;
+  thrd_exit(0);
 }
 
-int ems_reserve(unsigned int event_id, size_t num_seats, size_t* xs, size_t* ys) {
+int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
