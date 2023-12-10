@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <stdint.h>
 #include <pthread.h>
 
 #include "fileOperations.h"
@@ -41,6 +42,8 @@ void* processCommand(void* arg) {
   int fileDescriptorIn = threadData->fileDescriptorIn;
   int fileDescriptorOut = threadData->fileDescriptorOut;
 
+  int barrier=0;
+
   printf("fdIn: %d\n", fileDescriptorIn);
   printf("fdOut: %d\n", fileDescriptorOut);
 
@@ -48,15 +51,14 @@ void* processCommand(void* arg) {
 
   while (endOfFile) {
 
-    pthread_mutex_lock(&mutex_1);
-    enum Command command = get_next(fileDescriptorIn);
-    pthread_mutex_unlock(&mutex_1);
-    
-    printf("Command: %d\n", command);
+    if (barrier==1) pthread_exit((void*)BARRIER_EXIT);
 
-    switch (command) {
+    pthread_mutex_lock(&mutex_1);
+
+    switch (get_next(fileDescriptorIn)) {
       
       case CMD_CREATE:
+        pthread_mutex_unlock(&mutex_1);
         if (parse_create(fileDescriptorIn, &event_id, &num_rows, &num_columns) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
@@ -69,6 +71,7 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_RESERVE:
+        pthread_mutex_unlock(&mutex_1);
         num_coords = parse_reserve(fileDescriptorIn, MAX_RESERVATION_SIZE, &event_id, xs, ys);
 
         if (num_coords == 0) {
@@ -76,13 +79,14 @@ void* processCommand(void* arg) {
           continue;
         }
 
-        if (ems_reserve(event_id, num_coords, xs, ys, mutex_2)) {
+        if (ems_reserve(event_id, num_coords, xs, ys, &mutex_2)) {
           fprintf(stderr, "Failed to reserve seats\n");
         }
 
         break;
 
       case CMD_SHOW:
+        pthread_mutex_unlock(&mutex_1);
         if (parse_show(fileDescriptorIn, &event_id) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
@@ -94,6 +98,7 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_LIST_EVENTS:
+        pthread_mutex_unlock(&mutex_1);
         if (ems_list_events(fileDescriptorOut)) {
           fprintf(stderr, "Failed to list events\n");
         }
@@ -101,6 +106,7 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_WAIT:
+        pthread_mutex_unlock(&mutex_1);
         if (parse_wait(fileDescriptorIn, &delay, NULL) == -1) {  // thread_id is not implemented
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
@@ -115,10 +121,12 @@ void* processCommand(void* arg) {
 
 
       case CMD_INVALID:
-        fprintf(stderr, "Invalid command. See HELP for usage\n");
+        pthread_mutex_unlock(&mutex_1);
+        fprintf(stderr, "Invalid command c. See HELP for usage\n");
         break;
 
       case CMD_HELP:
+        pthread_mutex_unlock(&mutex_1);
         printf(
             "Available commands:\n"
             "  CREATE <event_id> <num_rows> <num_columns>\n"
@@ -132,14 +140,46 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_BARRIER:  // Not implemented
+        pthread_mutex_unlock(&mutex_1);
+        barrier=1;
+        //printf("barrier\n");
+        pthread_exit((void*)BARRIER_EXIT);
+        break;
       case CMD_EMPTY:
+        pthread_mutex_unlock(&mutex_1);
         break;
       case EOC:
+        pthread_mutex_unlock(&mutex_1);
         endOfFile=0;
       break;
     }
   }
   pthread_exit(NULL);
+}
+
+int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
+  for (int i = 0; i < max_threads; i++) {
+    threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
+
+    // allocation failure
+    if (threads[i] == NULL) {
+        fprintf(stderr, "Failed to allocate memory for ThreadData\n");
+
+        // Clean up previously allocated memory
+        for (int j = 0; j < i; j++) 
+          free(threads[j]);
+
+        return 1;  // Indicate failure
+    }
+
+    threads[i]->vector_position = i + 1;
+    threads[i]->fileDescriptorIn = fileDescriptorIn;
+    threads[i]->fileDescriptorOut = fileDescriptorOut;
+
+    pthread_create(&threads[i]->threadId, NULL, processCommand, (void*)threads[i]);
+  }
+
+  return 0;  // Indicate success
 }
 
 
@@ -155,11 +195,6 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to initialize the mutex.\n");
     return 1;
   }
-
-  //if (pthread_rwlock_init(&rwl, NULL) != 0) {
-    //fprintf(stderr, "Error: Failed to initialize the read-write lock.\n");
-    //return 1;
-  //}
 
   if (argc > 4) {
     char *endptr;
@@ -269,31 +304,29 @@ int main(int argc, char *argv[]) {
     printf("File name: %s\n", dp->d_name);
 
     ThreadData* threads[max_threads];
+    int fileExecuted = 1;
 
-    if (threads == NULL) {
-      fprintf(stderr, "Failed to allocate memory for threads\n");
-      return 1;
-    }
-
-    for (int i = 0; i < max_threads; i++) {
-
-      ThreadData* threadData = (ThreadData*)malloc(sizeof(ThreadData));
-      if (threadData == NULL) {
-          fprintf(stderr, "Failed to allocate memory for ThreadData\n");
-          return 1;
+    void* threadStatus;
+    while(fileExecuted){
+      if (createThreads(threads, max_threads, fileDescriptorIn, fileDescriptorOut) != 0) {
+        fprintf(stderr, "Failed to create threads.\n");
+        return 1;
       }
-
-      threads[i] = threadData;
-      threadData->vector_position = i + 1;
-      threadData->fileDescriptorIn = fileDescriptorIn;
-      threadData->fileDescriptorOut = fileDescriptorOut;
-      pthread_create(&threads[i]->threadId, NULL, processCommand, (void*)threadData);
+      
+      for (int i = 0; i < max_threads; i++) {
+        pthread_join(threads[i]->threadId, &threadStatus);
+        //printf("status of thread %d: %d\n", i, (int)(intptr_t)threadStatus);
+        free(threads[i]);
+        //printf("free thread %d\n", i);
+      }
+      if ((int)(intptr_t)threadStatus!=BARRIER_EXIT) {
+        printf("saiu aqui\n");
+        fileExecuted=0; // exits the file when it was all read
+        break;
+      }
+      //printf("novas threads\n");
     }
 
-    for (int i = 0; i < max_threads; i++) {
-      pthread_join(threads[i]->threadId, NULL);
-      free(threads[i]);
-    }
     close(fileDescriptorIn);
     close(fileDescriptorOut);
     exit(EXIT_SUCCESS);

@@ -25,7 +25,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
 /// @param ys Array of columns of the seats to reserve.
 /// @param mutex Synchronization mechanism.
 /// @return 0 if the reservation was created successfully, 1 otherwise.
-int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t mutex);
+int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t* mutex);
 
 /// Prints the given event.
 /// @param fd File descriptor to write in.

@@ -115,7 +115,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   return 0;
 }
 
-int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t mutex) {
+int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t *mutex) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -128,7 +128,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys,
     return 1;
   }
 
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(mutex);
 
   unsigned int reservation_id = ++event->reservations;
 
@@ -149,8 +149,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys,
 
     *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
   }
-
-  pthread_mutex_unlock(&mutex);
+  pthread_mutex_unlock(mutex);
 
   // If the reservation was not successful, free the seats that were reserved.
   if (i < num_seats) {
