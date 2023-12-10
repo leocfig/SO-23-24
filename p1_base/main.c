@@ -23,6 +23,8 @@ typedef struct {
   int fileDescriptorIn;
   int fileDescriptorOut;
   int vector_position;
+  int max_threads;
+  int *wait_vector;
 } ThreadData;
 
 pthread_mutex_t mutex_1;
@@ -31,8 +33,7 @@ pthread_mutex_t mutex_2;
 
 
 void* processCommand(void* arg) {
-  unsigned int event_id, delay; 
-  //thread_id;
+  unsigned int event_id, delay, thread_id;
   size_t num_rows, num_columns, num_coords;
   size_t xs[MAX_RESERVATION_SIZE], ys[MAX_RESERVATION_SIZE];
 
@@ -41,17 +42,26 @@ void* processCommand(void* arg) {
   //pthread_t threadId = threadData->threadId;
   int fileDescriptorIn = threadData->fileDescriptorIn;
   int fileDescriptorOut = threadData->fileDescriptorOut;
+  int max_threads = threadData->max_threads;
+  int vector_position = threadData->vector_position;
+  int *wait_vector = threadData->wait_vector;
+
+  if (wait_vector == NULL) {
+    fprintf(stderr, "Memory allocation failed\n");
+  }
 
   int barrier=0;
-
-  printf("fdIn: %d\n", fileDescriptorIn);
-  printf("fdOut: %d\n", fileDescriptorOut);
-
   int endOfFile = 1;
 
   while (endOfFile) {
 
     if (barrier==1) pthread_exit((void*)BARRIER_EXIT);
+
+    if (wait_vector[vector_position] == 1) {
+      printf("Waiting...\n");
+      ems_wait(delay);
+      wait_vector[vector_position] = 0;
+    }
 
     pthread_mutex_lock(&mutex_1);
 
@@ -107,18 +117,26 @@ void* processCommand(void* arg) {
 
       case CMD_WAIT:
         pthread_mutex_unlock(&mutex_1);
-        if (parse_wait(fileDescriptorIn, &delay, NULL) == -1) {  // thread_id is not implemented
+        int parse_result = parse_wait(fileDescriptorIn, &delay, &thread_id);
+        if (parse_result == -1) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
 
         if (delay > 0) {
-          printf("Waiting...\n");
-          ems_wait(delay);
+          if (parse_result == 0) {  // no thread was specified
+            for (int i = 0; i < max_threads; i++) {
+              wait_vector[i] = 1;
+            }
+          }
+          else {                    // if a thread was specified
+            if (thread_id > 0 && thread_id <= (unsigned)max_threads) {
+              wait_vector[thread_id - 1] = 1;
+            }
+          }
         }
 
         break;
-
 
       case CMD_INVALID:
         pthread_mutex_unlock(&mutex_1);
@@ -158,6 +176,9 @@ void* processCommand(void* arg) {
 }
 
 int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
+
+  int *wait_vector = (int *)calloc((size_t)max_threads, sizeof(int)); //  initialized to 0
+
   for (int i = 0; i < max_threads; i++) {
     threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
 
@@ -172,9 +193,11 @@ int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, 
         return 1;  // Indicate failure
     }
 
-    threads[i]->vector_position = i + 1;
+    threads[i]->vector_position = i;
     threads[i]->fileDescriptorIn = fileDescriptorIn;
     threads[i]->fileDescriptorOut = fileDescriptorOut;
+    threads[i]->max_threads = max_threads;
+    threads[i]->wait_vector = wait_vector;
 
     pthread_create(&threads[i]->threadId, NULL, processCommand, (void*)threads[i]);
   }
@@ -316,9 +339,12 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < max_threads; i++) {
         pthread_join(threads[i]->threadId, &threadStatus);
         //printf("status of thread %d: %d\n", i, (int)(intptr_t)threadStatus);
+        if (i == max_threads - 1)
+          free(threads[i]->wait_vector);
         free(threads[i]);
         //printf("free thread %d\n", i);
       }
+      
       if ((int)(intptr_t)threadStatus!=BARRIER_EXIT) {
         printf("saiu aqui\n");
         fileExecuted=0; // exits the file when it was all read
