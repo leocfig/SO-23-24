@@ -18,13 +18,25 @@
 #include "parser.h"
 
 
+typedef struct WaitOrder WaitOrder;
+
+struct WaitOrder {
+  WaitOrder* next;
+  unsigned int delay;
+};
+
+typedef struct{
+  WaitOrder* first;
+  WaitOrder* last;
+} WaitListNode;
+
 typedef struct {
   pthread_t threadId;
   int fileDescriptorIn;
   int fileDescriptorOut;
   int vector_position;
   int max_threads;
-  int *wait_vector;
+  WaitListNode *wait_vector;
 } ThreadData;
 
 pthread_mutex_t mutex_1;
@@ -44,7 +56,7 @@ void* processCommand(void* arg) {
   int fileDescriptorOut = threadData->fileDescriptorOut;
   int max_threads = threadData->max_threads;
   int vector_position = threadData->vector_position;
-  int *wait_vector = threadData->wait_vector;
+  WaitListNode *wait_vector = threadData->wait_vector;
 
   if (wait_vector == NULL) {
     fprintf(stderr, "Memory allocation failed\n");
@@ -57,10 +69,12 @@ void* processCommand(void* arg) {
 
     if (barrier==1) pthread_exit((void*)BARRIER_EXIT);
 
-    if (wait_vector[vector_position] == 1) {
+    while (wait_vector[vector_position].first != NULL) {
       printf("Waiting...\n");
-      ems_wait(delay);
-      wait_vector[vector_position] = 0;
+      ems_wait(wait_vector[vector_position].first->delay);
+      WaitOrder* new_first = wait_vector[vector_position].first->next;
+      free(wait_vector[vector_position].first);
+      wait_vector[vector_position].first = new_first;
     }
 
     pthread_mutex_lock(&mutex_1);
@@ -123,15 +137,28 @@ void* processCommand(void* arg) {
           continue;
         }
 
+
+        //CODIGO REPETIDO -- fazer funçao auxiliar?
         if (delay > 0) {
           if (parse_result == 0) {  // no thread was specified
-            for (int i = 0; i < max_threads; i++) {
-              wait_vector[i] = 1;
+            for (int i = 0; i < max_threads; i++) { 
+              WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
+              wait->delay=delay;
+              wait->next=NULL;
+              if (wait_vector[i].first == NULL) wait_vector[i].first = wait;
+              else wait_vector[i].last->next = wait;
+              wait_vector[i].last = wait;
             }
           }
           else {                    // if a thread was specified
             if (thread_id > 0 && thread_id <= (unsigned)max_threads) {
-              wait_vector[thread_id - 1] = 1;
+              unsigned int index = thread_id - 1;
+              WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
+              wait->delay=delay;
+              wait->next=NULL;
+              if (wait_vector[index].first == NULL) wait_vector[index].first = wait;
+              else wait_vector[index].last->next = wait;
+              wait_vector[index].last = wait;
             }
           }
         }
@@ -177,7 +204,13 @@ void* processCommand(void* arg) {
 
 int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
 
-  int *wait_vector = (int *)calloc((size_t)max_threads, sizeof(int)); //  initialized to 0
+  WaitListNode *wait_vector = (WaitListNode *)malloc((size_t)max_threads*sizeof(WaitListNode));
+  if (wait_vector == NULL) 
+    fprintf(stderr, "Failed to allocate memory\n");
+  for (int i = 0; i < max_threads; i++) {
+    wait_vector[i].first = NULL;
+    wait_vector[i].last = NULL;
+  }
 
   for (int i = 0; i < max_threads; i++) {
     threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
