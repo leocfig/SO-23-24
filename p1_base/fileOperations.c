@@ -19,6 +19,10 @@
 // - Pergunta 34
 // - Aquilo de supormos que .jobs era menor que .out
 
+// - Podemos tirar aquilo do parse_wait?
+// - "Além disso, o comando make clean deve limpar todos os ficheiros resultantes da compilação do projeto" - isto já não está feito?
+// - Aquilo do lock e unlock a ler o get_next
+
 
 int has_extension(const char *filename, const char *extension) {
 
@@ -116,30 +120,6 @@ void write_inFile(int fdOut, const char *buffer) {
 }
 
 
-int get_size_directory(const char *dirpath) {
 
-  DIR *dirp;
-  struct dirent *dp;
-  dirp = opendir(dirpath);
-
-  if (dirp == NULL) {
-    //errMsg("opendir failed on '%s'", dirpath);
-    return -1;
-  }
-  
-  int count = 0;
-
-  for (;;) {
-    errno = 0; /* To distinguish error from end-of-directory */
-    dp = readdir(dirp);
-    if (dp == NULL)
-      break;
-    if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || 
-        !has_extension(dp->d_name, ".jobs"))
-      continue; /* Skips . and .. and files with other extensions other than ".job" */
-    count++;
-  }
-  return count;
-}
 
 

@@ -21,8 +21,8 @@
 typedef struct WaitOrder WaitOrder;
 
 struct WaitOrder {
-  WaitOrder* next;
   unsigned int delay;
+  WaitOrder* next;
 };
 
 typedef struct{
@@ -42,6 +42,29 @@ typedef struct {
 pthread_mutex_t mutex_1;
 pthread_mutex_t mutex_2;
 //pthread_rwlock_t rwl;
+int barrier;
+
+
+
+void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index) {
+
+  WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
+  if (wait_vector == NULL) {
+    fprintf(stderr, "Failed to allocate memory\n");
+  }
+
+  wait->delay = delay;
+  wait->next = NULL;
+
+  if (wait_vector[index].first == NULL) {
+    wait_vector[index].first = wait;
+  } 
+  else {
+    wait_vector[index].last->next = wait;
+  }
+
+  wait_vector[index].last = wait;
+}
 
 
 void* processCommand(void* arg) {
@@ -58,11 +81,6 @@ void* processCommand(void* arg) {
   int vector_position = threadData->vector_position;
   WaitListNode *wait_vector = threadData->wait_vector;
 
-  if (wait_vector == NULL) {
-    fprintf(stderr, "Memory allocation failed\n");
-  }
-
-  int barrier=0;
   int endOfFile = 1;
 
   while (endOfFile) {
@@ -137,28 +155,16 @@ void* processCommand(void* arg) {
           continue;
         }
 
-
-        //CODIGO REPETIDO -- fazer funçao auxiliar?
         if (delay > 0) {
           if (parse_result == 0) {  // no thread was specified
             for (int i = 0; i < max_threads; i++) { 
-              WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
-              wait->delay=delay;
-              wait->next=NULL;
-              if (wait_vector[i].first == NULL) wait_vector[i].first = wait;
-              else wait_vector[i].last->next = wait;
-              wait_vector[i].last = wait;
+              addWaitOrder(wait_vector, delay, (unsigned)i);
             }
           }
           else {                    // if a thread was specified
             if (thread_id > 0 && thread_id <= (unsigned)max_threads) {
               unsigned int index = thread_id - 1;
-              WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
-              wait->delay=delay;
-              wait->next=NULL;
-              if (wait_vector[index].first == NULL) wait_vector[index].first = wait;
-              else wait_vector[index].last->next = wait;
-              wait_vector[index].last = wait;
+              addWaitOrder(wait_vector, delay, index);
             }
           }
         }
@@ -178,13 +184,13 @@ void* processCommand(void* arg) {
             "  RESERVE <event_id> [(<x1>,<y1>) (<x2>,<y2>) ...]\n"
             "  SHOW <event_id>\n"
             "  LIST\n"
-            "  WAIT <delay_ms> [thread_id]\n"  // thread_id is not implemented
-            "  BARRIER\n"                      // Not implemented
+            "  WAIT <delay_ms> [thread_id]\n"  
+            "  BARRIER\n"                      
             "  HELP\n");
 
         break;
 
-      case CMD_BARRIER:  // Not implemented
+      case CMD_BARRIER:
         pthread_mutex_unlock(&mutex_1);
         barrier=1;
         //printf("barrier\n");
@@ -196,10 +202,10 @@ void* processCommand(void* arg) {
       case EOC:
         pthread_mutex_unlock(&mutex_1);
         endOfFile=0;
-      break;
+        break;
     }
   }
-  pthread_exit(NULL);
+  pthread_exit((void*)EXIT_SUCCESS);
 }
 
 int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
@@ -207,10 +213,13 @@ int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, 
   WaitListNode *wait_vector = (WaitListNode *)malloc((size_t)max_threads*sizeof(WaitListNode));
   if (wait_vector == NULL) 
     fprintf(stderr, "Failed to allocate memory\n");
+
   for (int i = 0; i < max_threads; i++) {
     wait_vector[i].first = NULL;
     wait_vector[i].last = NULL;
   }
+
+  barrier=0;
 
   for (int i = 0; i < max_threads; i++) {
     threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
@@ -282,8 +291,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  size_t sizePath = strlen(dirpath);
   pid_t pid;
+  size_t sizePath = strlen(dirpath);
   int active_child_proc = 0;
   int status;
   int fileDescriptorIn, fileDescriptorOut;
