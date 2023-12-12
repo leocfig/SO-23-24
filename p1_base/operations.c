@@ -255,8 +255,6 @@ int ems_list_events(int fdOut) {
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
-    printf("Current appended: %d\n", current->event->id);
-    //printf("Next current appended: %d\n", current->next->event->id);
     write_inFile(fdOut, "Event: ");
     unsigned int *event_ID = (unsigned int*)malloc(sizeof(unsigned int) + 1);
     event_ID[0] = (current->event)->id;

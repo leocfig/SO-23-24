@@ -68,13 +68,12 @@ void* processCommand(void* arg) {
 
       case CMD_RESERVE:
         num_coords = parse_reserve(fileDescriptorIn, MAX_RESERVATION_SIZE, &event_id, xs, ys);
+        pthread_mutex_unlock(&mutex_1);
 
         if (num_coords == 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
-
-        pthread_mutex_unlock(&mutex_1);
 
         if (ems_reserve(event_id, num_coords, xs, ys)) {
           fprintf(stderr, "Failed to reserve seats\n");
@@ -153,7 +152,6 @@ void* processCommand(void* arg) {
       case CMD_BARRIER:
         pthread_mutex_unlock(&mutex_1);
         barrier = 1;
-        //printf("barrier\n");
         pthread_exit((void*)BARRIER_EXIT);
         break;
       case CMD_EMPTY:
@@ -335,25 +333,21 @@ int main(int argc, char *argv[]) {
       
       for (int i = 0; i < max_threads; i++) {
         pthread_join(threads[i]->threadId, &threadStatus);
-        //printf("status of thread %d: %d\n", i, (int)(intptr_t)threadStatus);
         while (threads[i]->wait_vector[i].first != NULL){
           WaitOrder* current = threads[i]->wait_vector[i].first->next;
           free(threads[i]->wait_vector[i].first);
-          threads[i]->wait_vector[i].first=current;
+          threads[i]->wait_vector[i].first = current;
         }
 
         if (i == max_threads - 1)
           free(threads[i]->wait_vector);
         free(threads[i]);
-        //printf("free thread %d\n", i);
       }
       
-      if ((int)(intptr_t)threadStatus!=BARRIER_EXIT) {
-        printf("saiu aqui\n");
+      if ((int)(intptr_t)threadStatus != BARRIER_EXIT) {
         fileExecuted = 0; // exits the file when it was all read
         break;
       }
-      //printf("novas threads\n");
     }
 
     close(fileDescriptorIn);
@@ -361,9 +355,6 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
   closedir(dirp);
-  //pthread_mutex_destroy(&mutex_1);
-  //pthread_mutex_destroy(&mutex_2);
-  //pthread_rwlock_destroy(&rwl);
   ems_terminate();
   return 0;
 }

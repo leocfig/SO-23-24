@@ -14,21 +14,18 @@
 
 
 // Dúvidas:
-// - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
-// - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
+// - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc) - porque suposemos que era sempre .jobs > .out
+// - Linha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
+
+
 // - Ver se printamos todos os erros
 // - Computadores dos labs
-// - Aquilo de supormos que .jobs era menor que .out
 
 
 // - Podemos tirar aquilo no parse_wait?
-// - "Além disso, o comando make clean deve limpar todos os ficheiros resultantes da compilação do projeto" - isto já não está feito?
-// - Aquilo do lock e unlock a ler o get_next --- PLEASE
-// - Podemos usar variáveis globais né? (Incluindo trincos) - E assim não precisamos de destruir né?
-// - Pergunta de processos partilharem a lista
-// - Delay que recebe-se como argumento
 // - Rdlocks and wrlocks
 // - Mudar de lugar o processCommand e o createThreads?
+// - Pôr locks no wait
 
 
 int has_extension(const char *filename, const char *extension) {
