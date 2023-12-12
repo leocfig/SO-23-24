@@ -18,53 +18,7 @@
 #include "parser.h"
 
 
-typedef struct WaitOrder WaitOrder;
-
-struct WaitOrder {
-  unsigned int delay;
-  WaitOrder* next;
-};
-
-typedef struct{
-  WaitOrder* first;
-  WaitOrder* last;
-} WaitListNode;
-
-typedef struct {
-  pthread_t threadId;
-  int fileDescriptorIn;
-  int fileDescriptorOut;
-  int vector_position;
-  int max_threads;
-  WaitListNode *wait_vector;
-} ThreadData;
-
-pthread_mutex_t mutex_1;
-pthread_mutex_t mutex_2;
-//pthread_rwlock_t rwl;
-int barrier;
-
-
-
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index) {
-
-  WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
-  if (wait_vector == NULL) {
-    fprintf(stderr, "Failed to allocate memory\n");
-  }
-
-  wait->delay = delay;
-  wait->next = NULL;
-
-  if (wait_vector[index].first == NULL) {
-    wait_vector[index].first = wait;
-  } 
-  else {
-    wait_vector[index].last->next = wait;
-  }
-
-  wait_vector[index].last = wait;
-}
+int barrier;  // Variável global
 
 
 void* processCommand(void* arg) {
@@ -74,7 +28,6 @@ void* processCommand(void* arg) {
 
   ThreadData* threadData = (ThreadData*)arg;
 
-  //pthread_t threadId = threadData->threadId;
   int fileDescriptorIn = threadData->fileDescriptorIn;
   int fileDescriptorOut = threadData->fileDescriptorOut;
   int max_threads = threadData->max_threads;
@@ -121,7 +74,7 @@ void* processCommand(void* arg) {
           continue;
         }
 
-        if (ems_reserve(event_id, num_coords, xs, ys, &mutex_2)) {
+        if (ems_reserve(event_id, num_coords, xs, ys)) {
           fprintf(stderr, "Failed to reserve seats\n");
         }
 
@@ -192,7 +145,7 @@ void* processCommand(void* arg) {
 
       case CMD_BARRIER:
         pthread_mutex_unlock(&mutex_1);
-        barrier=1;
+        barrier = 1;
         //printf("barrier\n");
         pthread_exit((void*)BARRIER_EXIT);
         break;
@@ -207,6 +160,7 @@ void* processCommand(void* arg) {
   }
   pthread_exit((void*)EXIT_SUCCESS);
 }
+
 
 int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
 
@@ -224,15 +178,14 @@ int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, 
   for (int i = 0; i < max_threads; i++) {
     threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
 
-    // allocation failure
     if (threads[i] == NULL) {
-        fprintf(stderr, "Failed to allocate memory for ThreadData\n");
+      fprintf(stderr, "Failed to allocate memory for ThreadData\n");
 
-        // Clean up previously allocated memory
-        for (int j = 0; j < i; j++) 
-          free(threads[j]);
+      // Clean up previously allocated memory
+      for (int j = 0; j < i; j++) 
+        free(threads[j]);
 
-        return 1;  // Indicate failure
+      return 1;  // To indicate failure
     }
 
     threads[i]->vector_position = i;
@@ -244,22 +197,12 @@ int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, 
     pthread_create(&threads[i]->threadId, NULL, processCommand, (void*)threads[i]);
   }
 
-  return 0;  // Indicate success
+  return 0;  // To indicate success
 }
 
 
 int main(int argc, char *argv[]) {
   unsigned int state_access_delay_ms = STATE_ACCESS_DELAY_MS;
-
-  if (pthread_mutex_init(&mutex_1, NULL) != 0) {
-    fprintf(stderr, "Failed to initialize the mutex.\n");
-    return 1;
-  }
-
-  if (pthread_mutex_init(&mutex_2, NULL) != 0) {
-    fprintf(stderr, "Failed to initialize the mutex.\n");
-    return 1;
-  }
 
   if (argc > 4) {
     char *endptr;
@@ -370,9 +313,10 @@ int main(int argc, char *argv[]) {
 
     ThreadData* threads[max_threads];
     int fileExecuted = 1;
-
     void* threadStatus;
-    while(fileExecuted){
+
+    while(fileExecuted) {
+
       if (createThreads(threads, max_threads, fileDescriptorIn, fileDescriptorOut) != 0) {
         fprintf(stderr, "Failed to create threads.\n");
         return 1;
@@ -389,7 +333,7 @@ int main(int argc, char *argv[]) {
       
       if ((int)(intptr_t)threadStatus!=BARRIER_EXIT) {
         printf("saiu aqui\n");
-        fileExecuted=0; // exits the file when it was all read
+        fileExecuted = 0; // exits the file when it was all read
         break;
       }
       //printf("novas threads\n");
@@ -400,8 +344,8 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
   closedir(dirp);
-  pthread_mutex_destroy(&mutex_1);
-  pthread_mutex_destroy(&mutex_2);
+  //pthread_mutex_destroy(&mutex_1);
+  //pthread_mutex_destroy(&mutex_2);
   //pthread_rwlock_destroy(&rwl);
   ems_terminate();
   return 0;

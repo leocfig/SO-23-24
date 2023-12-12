@@ -1,6 +1,7 @@
 #include "eventlist.h"
 
 #include <stdlib.h>
+#include <stdio.h>   // - Tirar
 
 struct EventList* create_list() {
   struct EventList* list = (struct EventList*)malloc(sizeof(struct EventList));
@@ -27,6 +28,8 @@ int append_to_list(struct EventList* list, struct Event* event) {
     list->tail = new_node;
   }
 
+  printf("List head: %d\n", list->head->event->id);
+  printf("Event appended in list: %d\n", list->tail->event->id);
   return 0;
 }
 

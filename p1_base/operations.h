@@ -2,6 +2,36 @@
 #define EMS_OPERATIONS_H
 
 #include <stddef.h>
+#include <pthread.h>
+
+
+typedef struct WaitOrder WaitOrder;
+
+struct WaitOrder {
+  unsigned int delay;
+  WaitOrder* next;
+};
+
+typedef struct{
+  WaitOrder* first;
+  WaitOrder* last;
+} WaitListNode;
+
+typedef struct {
+  pthread_t threadId;
+  int fileDescriptorIn;
+  int fileDescriptorOut;
+  int vector_position;
+  int max_threads;
+  WaitListNode *wait_vector;
+} ThreadData;
+
+
+extern pthread_mutex_t mutex_1;
+extern pthread_mutex_t mutex_2;
+extern pthread_mutex_t mutex_3;
+//extern pthread_rwlock_t rwl;
+
 
 /// Initializes the EMS state.
 /// @param delay_ms State access delay in milliseconds.
@@ -23,9 +53,8 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
 /// @param num_seats Number of seats to reserve.
 /// @param xs Array of rows of the seats to reserve.
 /// @param ys Array of columns of the seats to reserve.
-/// @param mutex Synchronization mechanism.
 /// @return 0 if the reservation was created successfully, 1 otherwise.
-int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys, pthread_mutex_t* mutex);
+int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys);
 
 /// Prints the given event.
 /// @param fd File descriptor to write in.
@@ -41,5 +70,11 @@ int ems_list_events(int fdOut);
 /// Waits for a given amount of time.
 /// @param delay_us Delay in milliseconds.
 void ems_wait(unsigned int delay_ms);
+
+/// Auxiliary function for the wait command
+/// @param wait_vector Vector for every thread's wait orders
+/// @param delay Delay in milliseconds.
+/// @param index Index
+void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index);
 
 #endif  // EMS_OPERATIONS_H

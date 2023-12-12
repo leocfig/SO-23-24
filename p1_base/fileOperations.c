@@ -9,19 +9,26 @@
 #include <sys/types.h>
 
 #include "fileOperations.h"
+#include "operations.h"
+
 
 
 // Dúvidas:
 // - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc)
 // - LInha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
-// - Erros
+// - Ver se printamos todos os erros
 // - Computadores dos labs
-// - Pergunta 34
 // - Aquilo de supormos que .jobs era menor que .out
 
-// - Podemos tirar aquilo do parse_wait?
+
+// - Podemos tirar aquilo no parse_wait?
 // - "Além disso, o comando make clean deve limpar todos os ficheiros resultantes da compilação do projeto" - isto já não está feito?
-// - Aquilo do lock e unlock a ler o get_next
+// - Aquilo do lock e unlock a ler o get_next --- PLEASE
+// - Podemos usar variáveis globais né? (Incluindo trincos) - E assim não precisamos de destruir né?
+// - Pergunta de processos partilharem a lista
+// - Delay que recebe-se como argumento
+// - Rdlocks and wrlocks
+// - Mudar de lugar o processCommand e o createThreads?
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -104,6 +111,8 @@ void write_inFile(int fdOut, const char *buffer) {
 
   ssize_t len = (ssize_t)strlen(buffer);
   ssize_t done = 0;
+
+  //pthread_mutex_lock(&mutex_1);
   
   while (len > 0) {
     ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
@@ -117,6 +126,8 @@ void write_inFile(int fdOut, const char *buffer) {
     len -= bytes_written;
     done += bytes_written;
   }
+  
+  //pthread_mutex_unlock(&mutex_1);
 }
 
 
