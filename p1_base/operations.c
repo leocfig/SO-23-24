@@ -278,7 +278,7 @@ void ems_wait(unsigned int delay_ms) {
 
 
 void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index) {
-
+  // colocar locks 
   WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
   if (wait_vector == NULL) {
     fprintf(stderr, "Failed to allocate memory\n");

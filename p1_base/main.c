@@ -53,11 +53,12 @@ void* processCommand(void* arg) {
     switch (get_next(fileDescriptorIn)) {
       
       case CMD_CREATE:
-        pthread_mutex_unlock(&mutex_1);
         if (parse_create(fileDescriptorIn, &event_id, &num_rows, &num_columns) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
+
+        pthread_mutex_unlock(&mutex_1);
 
         if (ems_create(event_id, num_rows, num_columns)) {
           fprintf(stderr, "Failed to create event\n");
@@ -66,13 +67,14 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_RESERVE:
-        pthread_mutex_unlock(&mutex_1);
         num_coords = parse_reserve(fileDescriptorIn, MAX_RESERVATION_SIZE, &event_id, xs, ys);
 
         if (num_coords == 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
+
+        pthread_mutex_unlock(&mutex_1);
 
         if (ems_reserve(event_id, num_coords, xs, ys)) {
           fprintf(stderr, "Failed to reserve seats\n");
@@ -81,11 +83,12 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_SHOW:
-        pthread_mutex_unlock(&mutex_1);
         if (parse_show(fileDescriptorIn, &event_id) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
         }
+
+        pthread_mutex_unlock(&mutex_1);
 
         if (ems_show(fileDescriptorOut, event_id)) {
           fprintf(stderr, "Failed to show event\n");
@@ -94,6 +97,7 @@ void* processCommand(void* arg) {
 
       case CMD_LIST_EVENTS:
         pthread_mutex_unlock(&mutex_1);
+
         if (ems_list_events(fileDescriptorOut)) {
           fprintf(stderr, "Failed to list events\n");
         }
@@ -101,8 +105,10 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_WAIT:
-        pthread_mutex_unlock(&mutex_1);
         int parse_result = parse_wait(fileDescriptorIn, &delay, &thread_id);
+
+        pthread_mutex_unlock(&mutex_1);
+
         if (parse_result == -1) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
           continue;
@@ -131,6 +137,7 @@ void* processCommand(void* arg) {
 
       case CMD_HELP:
         pthread_mutex_unlock(&mutex_1);
+        
         printf(
             "Available commands:\n"
             "  CREATE <event_id> <num_rows> <num_columns>\n"
@@ -214,6 +221,10 @@ int main(int argc, char *argv[]) {
     }
 
     state_access_delay_ms = (unsigned int)delay;
+  }
+  if (argc <= 3) {
+    fprintf(stderr, "Too few arguments\n");
+    return 1;
   }
 
   if (ems_init(state_access_delay_ms)) {
@@ -325,6 +336,12 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < max_threads; i++) {
         pthread_join(threads[i]->threadId, &threadStatus);
         //printf("status of thread %d: %d\n", i, (int)(intptr_t)threadStatus);
+        while (threads[i]->wait_vector[i].first != NULL){
+          WaitOrder* current = threads[i]->wait_vector[i].first->next;
+          free(threads[i]->wait_vector[i].first);
+          threads[i]->wait_vector[i].first=current;
+        }
+
         if (i == max_threads - 1)
           free(threads[i]->wait_vector);
         free(threads[i]);
