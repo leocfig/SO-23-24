@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <threads.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 
@@ -11,11 +11,12 @@
 
 //pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
 //pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_create = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_rwlock_t rwl_1 = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t rwl_2 = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t rwl_3 = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t rwl_reserve_and_show = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t rwl_show_and_list = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t rwl_command = PTHREAD_RWLOCK_INITIALIZER;
+
 
 
 static struct EventList* event_list = NULL;
@@ -87,12 +88,12 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     return 1;
   }
 
-  pthread_mutex_lock(&mutex_3);
+  pthread_mutex_lock(&mutex_create);
 
   //pthread_rwlock_rdlock(&rwl);
   if (get_event_with_delay(event_id) != NULL) {
     fprintf(stderr, "Event already exists\n");
-    pthread_mutex_unlock(&mutex_3);
+    pthread_mutex_unlock(&mutex_create);
     return 1;
   }
   //pthread_rwlock_unlock(&rwl);
@@ -101,7 +102,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
   if (event == NULL) {
     fprintf(stderr, "Error allocating memory for event\n");
-    pthread_mutex_unlock(&mutex_3);
+    pthread_mutex_unlock(&mutex_create);
     return 1;
   }
 
@@ -114,12 +115,16 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   if (event->data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
     free(event);
-    pthread_mutex_unlock(&mutex_3);
+    pthread_mutex_unlock(&mutex_create);
     return 1;
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
     event->data[i] = 0;
+  }
+
+  for (size_t i=0; i < 5; i++) { // initilize locks 
+    pthread_rwlock_init(&event->locks[i], NULL);
   }
 
   //pthread_rwlock_rdlock(&rwl);
@@ -128,11 +133,11 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
     free(event->data);
     free(event);
     //pthread_rwlock_unlock(&rwl);
-    pthread_mutex_unlock(&mutex_3);
+    pthread_mutex_unlock(&mutex_create);
     return 1;
   }
 
-  pthread_mutex_unlock(&mutex_3);
+  pthread_mutex_unlock(&mutex_create);
   //printf("Events appended: %d\n", event->id);
   //pthread_rwlock_unlock(&rwl);
   return 0;
@@ -146,9 +151,9 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
 
   //pthread_mutex_lock(&mutex_1);
 
-  pthread_rwlock_rdlock(&rwl_1);
+  pthread_rwlock_rdlock(&rwl_reserve_and_show);
   struct Event* event = get_event_with_delay(event_id);
-  pthread_rwlock_unlock(&rwl_1);
+  pthread_rwlock_unlock(&rwl_reserve_and_show);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
@@ -156,7 +161,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
     return 1;
   }
 
-  pthread_rwlock_wrlock(&rwl_1);
+  pthread_rwlock_wrlock(&event->locks[RESERVE_SHOW_LOCK]);
   unsigned int reservation_id = ++event->reservations;
 
   size_t i = 0;
@@ -184,11 +189,11 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
       *get_seat_with_delay(event, seat_index(event, xs[j], ys[j])) = 0;
     }
     //pthread_mutex_unlock(&mutex_1);
-    pthread_rwlock_unlock(&rwl_1);
+    pthread_rwlock_unlock(&event->locks[RESERVE_SHOW_LOCK]);
     return 1;
   }
 
-  pthread_rwlock_unlock(&rwl_1);
+  pthread_rwlock_unlock(&event->locks[RESERVE_SHOW_LOCK]);
   //pthread_mutex_unlock(&mutex_1);
   return 0;
 }
@@ -200,16 +205,16 @@ int ems_show(int fdOut, unsigned int event_id) {
   }
 
   //pthread_mutex_lock(&mutex_1);
-  pthread_rwlock_wrlock(&rwl_2);
+  pthread_rwlock_wrlock(&rwl_show_and_list);
 
-  pthread_rwlock_rdlock(&rwl_1);
+  pthread_rwlock_rdlock(&rwl_reserve_and_show);
   struct Event* event = get_event_with_delay(event_id);
-  pthread_rwlock_unlock(&rwl_1);
+  pthread_rwlock_unlock(&rwl_reserve_and_show);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
     //pthread_mutex_unlock(&mutex_1);
-    pthread_rwlock_unlock(&rwl_2);
+    pthread_rwlock_unlock(&rwl_show_and_list);
     return 1;
   }
 
@@ -219,11 +224,15 @@ int ems_show(int fdOut, unsigned int event_id) {
   if (row == NULL) {
     fprintf(stderr, "Memory allocation for row failed\n");
     //pthread_mutex_unlock(&mutex_1);
-    pthread_rwlock_unlock(&rwl_2);
+    pthread_rwlock_unlock(&rwl_show_and_list);
     return 1;
   }
 
-  pthread_rwlock_wrlock(&rwl_1);
+  pthread_rwlock_wrlock(&rwl_reserve_and_show);
+
+  char *char_buffer = (char *)malloc((event->rows * row_size * (UNS_INT_SIZE + 1) + 1 )* sizeof(char));
+  char_buffer[0]=0;
+
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1, k = 0; j <= event->cols; j++) {
 
@@ -231,13 +240,15 @@ int ems_show(int fdOut, unsigned int event_id) {
       row[k++] = *seat;
     }
     char *buffer = buffer_to_string(row, row_size, SHOW_KEY);
-    write_inFile(fdOut, buffer);
+    strcat(char_buffer,buffer);
     free(buffer);
   }
-  pthread_rwlock_unlock(&rwl_1);
+  write_inFile(fdOut, char_buffer);
+  pthread_rwlock_unlock(&rwl_reserve_and_show);
   free(row);
+  free(char_buffer);
   //pthread_mutex_unlock(&mutex_1);
-  pthread_rwlock_unlock(&rwl_2);
+  pthread_rwlock_unlock(&rwl_show_and_list);
   return 0;
 }
 
@@ -253,7 +264,7 @@ int ems_list_events(int fdOut) {
     return 0;
   }
   
-  pthread_rwlock_wrlock(&rwl_2);
+  pthread_rwlock_wrlock(&rwl_show_and_list);
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
@@ -267,7 +278,7 @@ int ems_list_events(int fdOut) {
     current = current->next;
   }
   
-  pthread_rwlock_unlock(&rwl_2);
+  pthread_rwlock_unlock(&rwl_show_and_list);
   return 0;
 }
 
@@ -277,8 +288,7 @@ void ems_wait(unsigned int delay_ms) {
 }
 
 
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index) {
-  // colocar locks 
+void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index, pthread_rwlock_t rwl_wait ) {
   WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
   if (wait_vector == NULL) {
     fprintf(stderr, "Failed to allocate memory\n");
@@ -286,6 +296,8 @@ void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int in
 
   wait->delay = delay;
   wait->next = NULL;
+
+  pthread_rwlock_wrlock(&rwl_wait);
 
   if (wait_vector[index].first == NULL) {
     wait_vector[index].first = wait;
@@ -295,4 +307,6 @@ void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int in
   }
 
   wait_vector[index].last = wait;
+
+  pthread_rwlock_unlock(&rwl_wait);
 }

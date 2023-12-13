@@ -32,7 +32,7 @@ typedef struct {
 extern pthread_mutex_t mutex_3;
 extern pthread_rwlock_t rwl_1;
 extern pthread_rwlock_t rwl_2;
-extern pthread_rwlock_t rwl_3;
+extern pthread_rwlock_t rwl_command;
 
 
 /// Initializes the EMS state.
@@ -77,6 +77,7 @@ void ems_wait(unsigned int delay_ms);
 /// @param wait_vector Vector for every thread's wait orders
 /// @param delay Delay in milliseconds.
 /// @param index Index
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index);
+/// @param rwl_wait The lock for the command
+void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index,pthread_rwlock_t rwl_wait );
 
 #endif  // EMS_OPERATIONS_H

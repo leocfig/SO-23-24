@@ -112,7 +112,7 @@ void write_inFile(int fdOut, const char *buffer) {
   ssize_t len = (ssize_t)strlen(buffer);
   ssize_t done = 0;
 
-  //pthread_rwlock_wrlock(&rwl_1);
+  //pthread_rwlock_wrlock(&rwl_reserve_and_show);
   
   while (len > 0) {
     ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
@@ -127,7 +127,7 @@ void write_inFile(int fdOut, const char *buffer) {
     done += bytes_written;
   }
   
-  //pthread_rwlock_unlock(&rwl_1);
+  //pthread_rwlock_unlock(&rwl_reserve_and_show);
 }
 
 

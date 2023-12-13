@@ -1,6 +1,7 @@
 #include "eventlist.h"
 
 #include <stdlib.h>
+#include <pthread.h>
 #include <stdio.h>   // - Tirar
 
 struct EventList* create_list() {
@@ -33,6 +34,9 @@ int append_to_list(struct EventList* list, struct Event* event) {
 
 static void free_event(struct Event* event) {
   if (!event) return;
+  for (size_t i = 0; i < 5; i++) {
+    pthread_rwlock_destroy(&event->locks[i]);
+  }
 
   free(event->data);
   free(event);
