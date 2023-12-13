@@ -9,10 +9,13 @@
 #include "fileOperations.h"
 
 
-pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
-//pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+
+pthread_rwlock_t rwl_1 = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t rwl_2 = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t rwl_3 = PTHREAD_RWLOCK_INITIALIZER;
 
 
 static struct EventList* event_list = NULL;
@@ -141,18 +144,19 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
     return 1;
   }
 
-  pthread_mutex_lock(&mutex_1);
+  //pthread_mutex_lock(&mutex_1);
 
-  //pthread_rwlock_rdlock(&rwl);
+  pthread_rwlock_rdlock(&rwl_1);
   struct Event* event = get_event_with_delay(event_id);
-  //pthread_rwlock_unlock(&rwl);
+  pthread_rwlock_unlock(&rwl_1);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
-    pthread_mutex_unlock(&mutex_1);
+    //pthread_mutex_unlock(&mutex_1);
     return 1;
   }
 
+  pthread_rwlock_wrlock(&rwl_1);
   unsigned int reservation_id = ++event->reservations;
 
   size_t i = 0;
@@ -170,24 +174,22 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
       break;
     }
 
-    //pthread_rwlock_wrlock(&rwl);
     *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
-    //pthread_rwlock_unlock(&rwl);
   }
 
   // If the reservation was not successful, free the seats that were reserved.
   if (i < num_seats) {
     event->reservations--;
     for (size_t j = 0; j < i; j++) {
-      //pthread_rwlock_wrlock(&rwl);
       *get_seat_with_delay(event, seat_index(event, xs[j], ys[j])) = 0;
-      //pthread_rwlock_unlock(&rwl);
     }
-    pthread_mutex_unlock(&mutex_1);
+    //pthread_mutex_unlock(&mutex_1);
+    pthread_rwlock_unlock(&rwl_1);
     return 1;
   }
 
-  pthread_mutex_unlock(&mutex_1);
+  pthread_rwlock_unlock(&rwl_1);
+  //pthread_mutex_unlock(&mutex_1);
   return 0;
 }
 
@@ -197,15 +199,17 @@ int ems_show(int fdOut, unsigned int event_id) {
     return 1;
   }
 
-  pthread_mutex_lock(&mutex_1);
-  pthread_mutex_lock(&mutex_2);
+  //pthread_mutex_lock(&mutex_1);
+  pthread_rwlock_wrlock(&rwl_2);
 
+  pthread_rwlock_rdlock(&rwl_1);
   struct Event* event = get_event_with_delay(event_id);
+  pthread_rwlock_unlock(&rwl_1);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
-    pthread_mutex_unlock(&mutex_1);
-    pthread_mutex_unlock(&mutex_2);
+    //pthread_mutex_unlock(&mutex_1);
+    pthread_rwlock_unlock(&rwl_2);
     return 1;
   }
 
@@ -214,28 +218,26 @@ int ems_show(int fdOut, unsigned int event_id) {
 
   if (row == NULL) {
     fprintf(stderr, "Memory allocation for row failed\n");
-    pthread_mutex_unlock(&mutex_1);
-    pthread_mutex_unlock(&mutex_2);
+    //pthread_mutex_unlock(&mutex_1);
+    pthread_rwlock_unlock(&rwl_2);
     return 1;
   }
 
+  pthread_rwlock_wrlock(&rwl_1);
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1, k = 0; j <= event->cols; j++) {
 
-      //pthread_rwlock_rdlock(&rwl);
       unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
       row[k++] = *seat;
-      //pthread_rwlock_unlock(&rwl);
     }
-
     char *buffer = buffer_to_string(row, row_size, SHOW_KEY);
     write_inFile(fdOut, buffer);
     free(buffer);
   }
-
+  pthread_rwlock_unlock(&rwl_1);
   free(row);
-  pthread_mutex_unlock(&mutex_1);
-  pthread_mutex_unlock(&mutex_2);
+  //pthread_mutex_unlock(&mutex_1);
+  pthread_rwlock_unlock(&rwl_2);
   return 0;
 }
 
@@ -251,7 +253,7 @@ int ems_list_events(int fdOut) {
     return 0;
   }
   
-  pthread_mutex_lock(&mutex_2);
+  pthread_rwlock_wrlock(&rwl_2);
 
   struct ListNode* current = event_list->head;
   while (current != NULL) {
@@ -265,7 +267,7 @@ int ems_list_events(int fdOut) {
     current = current->next;
   }
   
-  pthread_mutex_unlock(&mutex_2);
+  pthread_rwlock_unlock(&rwl_2);
   return 0;
 }
 

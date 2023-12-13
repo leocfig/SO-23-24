@@ -20,12 +20,15 @@
 
 // - Ver se printamos todos os erros
 // - Computadores dos labs
+// - Testar com os testes dos stores
+// - Ver o nome das coisas (variáveis e funções)
 
 
 // - Podemos tirar aquilo no parse_wait?
 // - Rdlocks and wrlocks
 // - Mudar de lugar o processCommand e o createThreads?
 // - Pôr locks no wait
+// - Mutex no create?
 
 
 int has_extension(const char *filename, const char *extension) {
@@ -109,7 +112,7 @@ void write_inFile(int fdOut, const char *buffer) {
   ssize_t len = (ssize_t)strlen(buffer);
   ssize_t done = 0;
 
-  //pthread_mutex_lock(&mutex_1);
+  //pthread_rwlock_wrlock(&rwl_1);
   
   while (len > 0) {
     ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
@@ -124,7 +127,7 @@ void write_inFile(int fdOut, const char *buffer) {
     done += bytes_written;
   }
   
-  //pthread_mutex_unlock(&mutex_1);
+  //pthread_rwlock_unlock(&rwl_1);
 }
 
 

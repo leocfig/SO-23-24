@@ -48,17 +48,18 @@ void* processCommand(void* arg) {
       wait_vector[vector_position].first = new_first;
     }
 
-    pthread_mutex_lock(&mutex_1);
+    pthread_rwlock_wrlock(&rwl_3);
 
     switch (get_next(fileDescriptorIn)) {
       
       case CMD_CREATE:
         if (parse_create(fileDescriptorIn, &event_id, &num_rows, &num_columns) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
+          pthread_rwlock_unlock(&rwl_3);
           continue;
         }
 
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
 
         if (ems_create(event_id, num_rows, num_columns)) {
           fprintf(stderr, "Failed to create event\n");
@@ -68,7 +69,7 @@ void* processCommand(void* arg) {
 
       case CMD_RESERVE:
         num_coords = parse_reserve(fileDescriptorIn, MAX_RESERVATION_SIZE, &event_id, xs, ys);
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
 
         if (num_coords == 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
@@ -84,10 +85,11 @@ void* processCommand(void* arg) {
       case CMD_SHOW:
         if (parse_show(fileDescriptorIn, &event_id) != 0) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
+          pthread_rwlock_unlock(&rwl_3);
           continue;
         }
 
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
 
         if (ems_show(fileDescriptorOut, event_id)) {
           fprintf(stderr, "Failed to show event\n");
@@ -95,7 +97,7 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_LIST_EVENTS:
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
 
         if (ems_list_events(fileDescriptorOut)) {
           fprintf(stderr, "Failed to list events\n");
@@ -105,8 +107,7 @@ void* processCommand(void* arg) {
 
       case CMD_WAIT:
         int parse_result = parse_wait(fileDescriptorIn, &delay, &thread_id);
-
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
 
         if (parse_result == -1) {
           fprintf(stderr, "Invalid command. See HELP for usage\n");
@@ -130,12 +131,12 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_INVALID:
-        pthread_mutex_unlock(&mutex_1);
-        fprintf(stderr, "Invalid command c. See HELP for usage\n");
+        pthread_rwlock_unlock(&rwl_3);
+        fprintf(stderr, "Invalid command. See HELP for usage\n");
         break;
 
       case CMD_HELP:
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
         
         printf(
             "Available commands:\n"
@@ -150,15 +151,15 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_BARRIER:
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
         barrier = 1;
         pthread_exit((void*)BARRIER_EXIT);
         break;
       case CMD_EMPTY:
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
         break;
       case EOC:
-        pthread_mutex_unlock(&mutex_1);
+        pthread_rwlock_unlock(&rwl_3);
         endOfFile=0;
         break;
     }
@@ -181,7 +182,7 @@ int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, 
   barrier=0;
 
   for (int i = 0; i < max_threads; i++) {
-    threads[i] = (ThreadData*)malloc(sizeof( ThreadData));
+    threads[i] = (ThreadData*)malloc(sizeof(ThreadData));
 
     if (threads[i] == NULL) {
       fprintf(stderr, "Failed to allocate memory for ThreadData\n");

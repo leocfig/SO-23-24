@@ -27,10 +27,12 @@ typedef struct {
 } ThreadData;
 
 
-extern pthread_mutex_t mutex_1;
-extern pthread_mutex_t mutex_2;
+//extern pthread_mutex_t mutex_1;
+//extern pthread_mutex_t mutex_2;
 extern pthread_mutex_t mutex_3;
-//extern pthread_rwlock_t rwl;
+extern pthread_rwlock_t rwl_1;
+extern pthread_rwlock_t rwl_2;
+extern pthread_rwlock_t rwl_3;
 
 
 /// Initializes the EMS state.
