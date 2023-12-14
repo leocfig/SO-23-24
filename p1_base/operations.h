@@ -50,6 +50,9 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
 /// @return 0 if the reservation was created successfully, 1 otherwise.
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys);
 
+//Com
+void sort_seats(size_t x[], size_t y[], size_t num_seats);
+
 /// Prints the given event.
 /// @param fd File descriptor to write in.
 /// @param event_id Id of the event to print.

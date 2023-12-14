@@ -4,16 +4,19 @@
 #include <stddef.h>
 #include <pthread.h>
 
-
+struct Seat {
+  unsigned int* reservation_id;  // Reservation ID for the seat
+  pthread_rwlock_t lock;        // Read-write lock for the seat
+};
 
 struct Event {
-  unsigned int id;            /// Event id
-  unsigned int reservations;  /// Number of reservations for the event.
+  unsigned int id;                      /// Event id
+  unsigned int reservations;            /// Number of reservations for the event.
 
   size_t cols;  /// Number of columns.
   size_t rows;  /// Number of rows.
 
-  unsigned int* data;  /// Array of size rows * cols with the reservations for each seat.
+  struct Seat* data;             /// Array of size rows * cols with the seats.
   pthread_rwlock_t lock_event;
 };
 

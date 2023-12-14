@@ -18,6 +18,7 @@
 #include "parser.h"
 
 
+
 int barrier;  // Variável global
 pthread_mutex_t mutex_wait = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_command = PTHREAD_MUTEX_INITIALIZER;

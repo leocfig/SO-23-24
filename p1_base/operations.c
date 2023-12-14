@@ -9,12 +9,8 @@
 #include "fileOperations.h"
 
 
-//pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
-//pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t rwl_create = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t rwl_reserve_and_show = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t rwl_show_and_list = PTHREAD_RWLOCK_INITIALIZER;
-
 
 
 static struct EventList* event_list = NULL;
@@ -42,8 +38,8 @@ static struct Event* get_event_with_delay(unsigned int event_id) {
 /// @note Will wait to simulate a real system accessing a costly memory resource.
 /// @param event Event to get the seat from.
 /// @param index Index of the seat to get.
-/// @return Pointer to the seat.
-static unsigned int* get_seat_with_delay(struct Event* event, size_t index) {
+/// @return Pointer to the seat struct.
+static struct Seat* get_seat_with_delay(struct Event* event, size_t index) {
   struct timespec delay = delay_to_timespec(state_access_delay_ms);
   nanosleep(&delay, NULL);  // Should not be removed
 
@@ -102,7 +98,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   event->rows = num_rows;
   event->cols = num_cols;
   event->reservations = 0;
-  event->data = malloc(num_rows * num_cols * sizeof(unsigned int));
+  event->data = malloc(num_rows * num_cols * sizeof(struct Seat));
   pthread_rwlock_init(&event->lock_event, NULL);
 
   if (event->data == NULL) {
@@ -112,12 +108,23 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   }
 
   for (size_t i = 0; i < num_rows * num_cols; i++) {
-    event->data[i] = 0;
+    event->data[i].reservation_id = (unsigned int*)malloc(sizeof(unsigned int));
+    if (event->data[i].reservation_id == NULL) {
+      fprintf(stderr, "Error allocating memory for reservation_id\n");
+      return 1;
+    }
+    *(event->data[i].reservation_id) = 0;
+    pthread_rwlock_init(&event->data[i].lock, NULL);
   }
 
   pthread_rwlock_wrlock(&rwl_create);
   if (append_to_list(event_list, event) != 0) {
     fprintf(stderr, "Error appending event to list\n");
+    pthread_rwlock_destroy(&event->lock_event);
+    for (size_t i = 0; i < event->rows * event->cols; i++) {
+      pthread_rwlock_destroy(&event->data[i].lock);
+      free(event->data[i].reservation_id);
+    }
     free(event->data);
     free(event);
     pthread_rwlock_unlock(&rwl_create);
@@ -127,15 +134,36 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   return 0;
 }
 
+void sort_seats(size_t x[], size_t y[], size_t num_seats) {
+  for (size_t i = 0; i < num_seats - 1; i++) {
+    for (size_t j = 0; j < num_seats - i - 1; j++) {
+      if (x[j] > x[j + 1] || (x[j] == x[j + 1] && y[j] > y[j + 1])) {
+        // Swap x
+        size_t temp = x[j];
+        x[j] = x[j + 1];
+        x[j + 1] = temp;
+
+        // Swap y
+        temp = y[j];
+        y[j] = y[j + 1];
+        y[j + 1] = temp;
+
+      }
+    }
+  }
+    //for (size_t i=0; i < num_seats;i++){
+      //printf("%ld,%ld\n", x[i],y[i]);
+    //}
+    //printf("done sort\n");
+}
+
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys) {
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
   }
 
-  pthread_rwlock_rdlock(&rwl_reserve_and_show);
   struct Event* event = get_event_with_delay(event_id);
-  pthread_rwlock_unlock(&rwl_reserve_and_show);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
@@ -144,6 +172,12 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
 
   pthread_rwlock_wrlock(&event->lock_event);
   unsigned int reservation_id = ++event->reservations;
+  pthread_rwlock_unlock(&event->lock_event);
+
+  sort_seats(xs, ys, num_seats);
+  for (size_t i=0; i < num_seats;i++){
+    printf("%ld,%ld\n", xs[i],ys[i]);
+  }
 
   size_t i = 0;
   for (; i < num_seats; i++) {
@@ -155,25 +189,45 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
       break;
     }
 
-    if (*get_seat_with_delay(event, seat_index(event, row, col)) != 0) {
+    struct Seat* seat = get_seat_with_delay(event, seat_index(event, row, col));
+
+    pthread_rwlock_wrlock(&seat->lock);
+
+    if (*seat->reservation_id != 0) {
       fprintf(stderr, "Seat already reserved\n");
+      pthread_rwlock_unlock(&seat->lock);
       break;
     }
 
-    *get_seat_with_delay(event, seat_index(event, row, col)) = reservation_id;
+    *seat->reservation_id = reservation_id;
+    //pthread_rwlock_unlock(&seat->lock);
   }
 
   // If the reservation was not successful, free the seats that were reserved.
   if (i < num_seats) {
+    pthread_rwlock_wrlock(&event->lock_event);
     event->reservations--;
-    for (size_t j = 0; j < i; j++) {
-      *get_seat_with_delay(event, seat_index(event, xs[j], ys[j])) = 0;
-    }
     pthread_rwlock_unlock(&event->lock_event);
+    for (size_t j = 0; j < i; j++) {
+      struct Seat* seat = get_seat_with_delay(event, seat_index(event, xs[j], ys[j]));
+      //pthread_rwlock_wrlock(&seat->lock);
+      *seat->reservation_id = 0;
+      pthread_rwlock_unlock(&seat->lock);
+    }
+    //pthread_rwlock_unlock(&event->lock_event);
     return 1;
   }
 
-  pthread_rwlock_unlock(&event->lock_event);
+  i = 0;
+  for (; i < num_seats; i++) {
+    size_t row = xs[i];
+    size_t col = ys[i];
+    struct Seat* seat = get_seat_with_delay(event, seat_index(event, row, col));
+
+    pthread_rwlock_unlock(&seat->lock);
+  }
+
+  //pthread_rwlock_unlock(&event->lock_event);
   return 0;
 }
 
@@ -183,9 +237,7 @@ int ems_show(int fdOut, unsigned int event_id) {
     return 1;
   }
 
-  pthread_rwlock_rdlock(&rwl_reserve_and_show);
   struct Event* event = get_event_with_delay(event_id);
-  pthread_rwlock_unlock(&rwl_reserve_and_show);
 
   if (event == NULL) {
     fprintf(stderr, "Event not found\n");
@@ -200,12 +252,12 @@ int ems_show(int fdOut, unsigned int event_id) {
     return 1;
   }
 
-  pthread_rwlock_rdlock(&event->lock_event);
+  //pthread_rwlock_rdlock(&event->lock_event);
 
   char *char_buffer = (char *)malloc((event->rows * row_size * (UNS_INT_SIZE + 1) + 1 )* sizeof(char));
   if (char_buffer == NULL) {
     fprintf(stderr, "Memory allocation for char_buffer failed\n");
-    pthread_rwlock_unlock(&event->lock_event);
+    //pthread_rwlock_unlock(&event->lock_event);
     return 1;
   }
   char_buffer[0]=0;
@@ -213,16 +265,25 @@ int ems_show(int fdOut, unsigned int event_id) {
   for (size_t i = 1; i <= event->rows; i++) {
     for (size_t j = 1, k = 0; j <= event->cols; j++) {
 
-      unsigned int* seat = get_seat_with_delay(event, seat_index(event, i, j));
-      row[k++] = *seat;
+      struct Seat* seat = get_seat_with_delay(event, seat_index(event, i, j));
+      pthread_rwlock_rdlock(&seat->lock);
+      row[k++] = *seat->reservation_id;
     }
     char *buffer = buffer_to_string(row, row_size, SHOW_KEY);
     strcat(char_buffer,buffer);
     free(buffer);
   }
-  pthread_rwlock_unlock(&event->lock_event);
-  write_inFile(fdOut, char_buffer);
 
+  for (size_t i = 1; i <= event->rows; i++) {
+    for (size_t j = 1; j <= event->cols; j++) {
+
+      struct Seat* seat = get_seat_with_delay(event, seat_index(event, i, j));
+      pthread_rwlock_unlock(&seat->lock);
+    }
+  }
+
+  //pthread_rwlock_unlock(&event->lock_event);
+  write_inFile(fdOut, char_buffer);
   free(row);
   free(char_buffer);
   return 0;

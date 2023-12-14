@@ -14,21 +14,14 @@
 
 
 // Dúvidas:
-// - Podemos assumir que o tamanho da nova extensão é sempre menor do que a extensão antiga? (If not, temos de fazer um realloc) - porque suposemos que era sempre .jobs > .out
-// - Linha ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len); no writeFile
-
+// - rwl_create para cada evento ou mutex como temos?
+// - rdwritelock entre get event
 
 // - Ver se printamos todos os erros
 // - Computadores dos labs
 // - Testar com os testes dos stores
 // - Ver o nome das coisas (variáveis e funções)
 
-
-// - Podemos tirar aquilo no parse_wait?
-// - Rdlocks and wrlocks
-// - Mudar de lugar o processCommand e o createThreads?
-// - Pôr locks no wait
-// - Mutex no create?
 
 pthread_mutex_t mutex_write = PTHREAD_MUTEX_INITIALIZER;
 
@@ -109,14 +102,13 @@ int openFile(const char *path, int flags, mode_t mode) {
 
 void write_inFile(int fdOut, const char *buffer) {
 
-  ssize_t len = (ssize_t)strlen(buffer);
+  size_t len = strlen(buffer);
   ssize_t done = 0;
 
-  //pthread_rwlock_wrlock(&rwl_reserve_and_show);
   pthread_mutex_lock(&mutex_write);
   
   while (len > 0) {
-    ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
+    ssize_t bytes_written = write(fdOut, buffer + done, len);
 
     if (bytes_written < 0) {
       fprintf(stderr, "write error: %s\n", strerror(errno));
@@ -124,12 +116,10 @@ void write_inFile(int fdOut, const char *buffer) {
     }
 
     /* might not have managed to write all, len becomes what remains */
-    len -= bytes_written;
+    len -= (size_t)bytes_written;
     done += bytes_written;
   }
   pthread_mutex_unlock(&mutex_write);
-  
-  //pthread_rwlock_unlock(&rwl_reserve_and_show);
 }
 
 

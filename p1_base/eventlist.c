@@ -2,7 +2,6 @@
 
 #include <stdlib.h>
 #include <pthread.h>
-#include <stdio.h>   // - Tirar
 
 struct EventList* create_list() {
   struct EventList* list = (struct EventList*)malloc(sizeof(struct EventList));
@@ -38,6 +37,11 @@ int append_to_list(struct EventList* list, struct Event* event) {
 static void free_event(struct Event* event) {
   if (!event) return;
   pthread_rwlock_destroy(&event->lock_event);
+
+  for (size_t i = 0; i < event->rows * event->cols; i++) {
+    pthread_rwlock_destroy(&event->data[i].lock);
+    free(event->data[i].reservation_id);
+  }
 
   free(event->data);
   free(event);
