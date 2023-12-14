@@ -101,8 +101,7 @@ int openFile(const char *path, int flags, mode_t mode) {
 
   int fd = open(path, flags, mode);
   if (fd < 0){
-    fprintf(stderr, "open error: %s\n", strerror(errno));
-    // return -1; aqui não fazemos nada né? Porque o stor tinha dito que podiamos fazer o que quiséssemos
+    return -1;
   }
   return fd;
 }

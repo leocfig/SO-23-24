@@ -21,8 +21,6 @@
 int barrier;  // Variável global
 pthread_mutex_t mutex_wait = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_command = PTHREAD_MUTEX_INITIALIZER;
-//pthread_rwlock_t rwl_command = PTHREAD_RWLOCK_INITIALIZER;
-
 
 void* processCommand(void* arg) {
   unsigned int event_id, delay, thread_id;
@@ -286,8 +284,16 @@ int main(int argc, char *argv[]) {
       strcat(filePath, "/");
 
       fileDescriptorIn = open(strcat(filePath, dp->d_name), O_RDONLY, NULL);
+      if (fileDescriptorIn < 0){
+        fprintf(stderr, "Open error: %s\n", strerror(errno));
+        return -1;
+      }
       fileDescriptorOut = openFile(change_extension(filePath, "out"), 
                               O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+      if (fileDescriptorOut < 0){
+        fprintf(stderr, "Open error: %s\n", strerror(errno));
+        return -1;
+      }
 
       free(filePath);
 

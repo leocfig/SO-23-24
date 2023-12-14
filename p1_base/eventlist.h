@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <pthread.h>
 
+
+
 struct Event {
   unsigned int id;            /// Event id
   unsigned int reservations;  /// Number of reservations for the event.
