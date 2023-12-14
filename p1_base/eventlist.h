@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <pthread.h>
 
-#define RESERVE_SHOW_LOCK 3
-
 struct Event {
   unsigned int id;            /// Event id
   unsigned int reservations;  /// Number of reservations for the event.
@@ -14,7 +12,7 @@ struct Event {
   size_t rows;  /// Number of rows.
 
   unsigned int* data;  /// Array of size rows * cols with the reservations for each seat.
-  pthread_rwlock_t locks[5];
+  pthread_rwlock_t lock_event;
 };
 
 struct ListNode {
@@ -26,6 +24,7 @@ struct ListNode {
 struct EventList {
   struct ListNode* head;  // Head of the list
   struct ListNode* tail;  // Tail of the list
+  unsigned int total_events; // Total number of events
 };
 
 /// Creates a new event list.

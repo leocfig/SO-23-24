@@ -9,6 +9,8 @@
 #define LIST_KEY     1
 #define ERROR_MEMORY 25
 
+extern pthread_mutex_t mutex_write;
+
 
 int has_extension(const char *filename, const char *extension);
 

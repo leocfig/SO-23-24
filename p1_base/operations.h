@@ -27,14 +27,6 @@ typedef struct {
 } ThreadData;
 
 
-//extern pthread_mutex_t mutex_1;
-//extern pthread_mutex_t mutex_2;
-extern pthread_mutex_t mutex_3;
-extern pthread_rwlock_t rwl_1;
-extern pthread_rwlock_t rwl_2;
-extern pthread_rwlock_t rwl_command;
-
-
 /// Initializes the EMS state.
 /// @param delay_ms State access delay in milliseconds.
 /// @return 0 if the EMS state was initialized successfully, 1 otherwise.
@@ -78,6 +70,6 @@ void ems_wait(unsigned int delay_ms);
 /// @param delay Delay in milliseconds.
 /// @param index Index
 /// @param rwl_wait The lock for the command
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index,pthread_rwlock_t rwl_wait );
+void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index,pthread_mutex_t rwl_wait );
 
 #endif  // EMS_OPERATIONS_H

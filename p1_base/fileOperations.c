@@ -30,6 +30,7 @@
 // - Pôr locks no wait
 // - Mutex no create?
 
+pthread_mutex_t mutex_write = PTHREAD_MUTEX_INITIALIZER;
 
 int has_extension(const char *filename, const char *extension) {
 
@@ -113,6 +114,7 @@ void write_inFile(int fdOut, const char *buffer) {
   ssize_t done = 0;
 
   //pthread_rwlock_wrlock(&rwl_reserve_and_show);
+  pthread_mutex_lock(&mutex_write);
   
   while (len > 0) {
     ssize_t bytes_written = write(fdOut, buffer + done, (size_t)len);
@@ -126,6 +128,7 @@ void write_inFile(int fdOut, const char *buffer) {
     len -= bytes_written;
     done += bytes_written;
   }
+  pthread_mutex_unlock(&mutex_write);
   
   //pthread_rwlock_unlock(&rwl_reserve_and_show);
 }

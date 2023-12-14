@@ -9,6 +9,7 @@ struct EventList* create_list() {
   if (!list) return NULL;
   list->head = NULL;
   list->tail = NULL;
+  list->total_events=0;
   return list;
 }
 
@@ -20,6 +21,8 @@ int append_to_list(struct EventList* list, struct Event* event) {
 
   new_node->event = event;
   new_node->next = NULL;
+
+  list->total_events++;
 
   if (list->head == NULL) {
     list->head = new_node;
@@ -34,9 +37,7 @@ int append_to_list(struct EventList* list, struct Event* event) {
 
 static void free_event(struct Event* event) {
   if (!event) return;
-  for (size_t i = 0; i < 5; i++) {
-    pthread_rwlock_destroy(&event->locks[i]);
-  }
+  pthread_rwlock_destroy(&event->lock_event);
 
   free(event->data);
   free(event);
