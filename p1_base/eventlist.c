@@ -36,7 +36,6 @@ int append_to_list(struct EventList* list, struct Event* event) {
 
 static void free_event(struct Event* event) {
   if (!event) return;
-  pthread_rwlock_destroy(&event->lock_event);
 
   for (size_t i = 0; i < event->rows * event->cols; i++) {
     pthread_rwlock_destroy(&event->data[i].lock);
