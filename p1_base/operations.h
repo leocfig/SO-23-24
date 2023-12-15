@@ -77,6 +77,6 @@ void ems_wait(unsigned int delay_ms);
 /// @param delay Delay in milliseconds.
 /// @param index Index
 /// @param rwl_wait The lock for the command
-void addWaitOrder(WaitList* wait_vector, unsigned int delay, unsigned int index,pthread_mutex_t rwl_wait );
+//void addWaitOrder(WaitList* wait_vector, unsigned int delay, unsigned int index,pthread_mutex_t rwl_wait );
 
 #endif  // EMS_OPERATIONS_H

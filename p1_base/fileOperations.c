@@ -12,13 +12,9 @@
 #include "operations.h"
 
 
-
 // Dúvidas:
-// - rdwritelock entre get event? Aquela dúvida que está no operation.c?
-// - Perguntar ao stor se podemos deixar na main.c as funções processCommand e createThreads
 
-// - Computadores dos labs
-// - Testar com os testes dos stores
+// - Computadores dos labs testando com os testes dos stores
 
 
 pthread_mutex_t mutex_write = PTHREAD_MUTEX_INITIALIZER;

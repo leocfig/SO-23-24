@@ -23,6 +23,31 @@ int barrier;  // Variável global
 pthread_mutex_t mutex_wait = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_command = PTHREAD_MUTEX_INITIALIZER;
 
+
+void addWaitOrder(WaitList* wait_vector, unsigned int delay, unsigned int index) {
+  WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
+  if (wait == NULL) {
+    fprintf(stderr, "Failed to allocate memory for a Wait Order\n");
+    return;
+  }
+
+  wait->delay = delay;
+  wait->next = NULL;
+
+  pthread_mutex_lock(&mutex_wait);
+
+  if (wait_vector[index].first == NULL) {
+    wait_vector[index].first = wait;
+  } 
+  else {
+    wait_vector[index].last->next = wait;
+  }
+
+  wait_vector[index].last = wait;
+  pthread_mutex_unlock(&mutex_wait);
+}
+
+
 void* processCommand(void* arg) {
   unsigned int event_id, delay, thread_id;
   size_t num_rows, num_columns, num_coords;
@@ -39,11 +64,22 @@ void* processCommand(void* arg) {
   int endOfFile = 1;
 
   while (endOfFile) {
+    
+    pthread_mutex_lock(&mutex_command);
 
-    if (barrier==1) pthread_exit((void*)BARRIER_EXIT);
+    if (barrier==1) {
+      pthread_mutex_unlock(&mutex_command);
+      pthread_exit((void*)BARRIER_EXIT);
+    }
+    
+    pthread_mutex_unlock(&mutex_command);
+
+    pthread_mutex_lock(&mutex_wait);
 
     while (wait_vector[vector_position].first != NULL) {
       printf("Waiting...\n");
+      pthread_mutex_unlock(&mutex_wait);
+
       ems_wait(wait_vector[vector_position].first->delay);
 
       pthread_mutex_lock(&mutex_wait);
@@ -52,9 +88,9 @@ void* processCommand(void* arg) {
       wait_vector[vector_position].first = new_first;
       if (wait_vector[vector_position].first == NULL)
         wait_vector[vector_position].last = NULL;
-      pthread_mutex_unlock(&mutex_wait);
     }
-
+    
+    pthread_mutex_unlock(&mutex_wait);
     pthread_mutex_lock(&mutex_command);
 
     switch (get_next(fileDescriptorIn)) {
@@ -124,13 +160,13 @@ void* processCommand(void* arg) {
         if (delay > 0) {
           if (parse_result == 0) {  // no thread was specified
             for (int i = 0; i < max_threads; i++) { 
-              addWaitOrder(wait_vector, delay, (unsigned)i, mutex_wait);
+              addWaitOrder(wait_vector, delay, (unsigned)i);
             }
           }
           else {                    // if a thread was specified
             if (thread_id > 0 && thread_id <= (unsigned)max_threads) {
               unsigned int index = thread_id - 1;
-              addWaitOrder(wait_vector, delay, index, mutex_wait);
+              addWaitOrder(wait_vector, delay, index);
             }
           }
         }
@@ -158,8 +194,8 @@ void* processCommand(void* arg) {
         break;
 
       case CMD_BARRIER:
-        pthread_mutex_unlock(&mutex_command);
         barrier = 1;
+        pthread_mutex_unlock(&mutex_command);
         pthread_exit((void*)BARRIER_EXIT);
         break;
       case CMD_EMPTY:
@@ -373,4 +409,5 @@ int main(int argc, char *argv[]) {
   ems_terminate();
   return 0;
 }
+
 
