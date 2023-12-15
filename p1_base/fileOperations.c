@@ -14,13 +14,11 @@
 
 
 // Dúvidas:
-// - rwl_create para cada evento ou mutex como temos?
-// - rdwritelock entre get event
+// - rdwritelock entre get event? Aquela dúvida que está no operation.c?
+// - Perguntar ao stor se podemos deixar na main.c as funções processCommand e createThreads
 
-// - Ver se printamos todos os erros
 // - Computadores dos labs
 // - Testar com os testes dos stores
-// - Ver o nome das coisas (variáveis e funções)
 
 
 pthread_mutex_t mutex_write = PTHREAD_MUTEX_INITIALIZER;
@@ -40,7 +38,7 @@ int has_extension(const char *filename, const char *extension) {
 }
 
 
-char *change_extension(char *filename, const char *extension) { // checkar isto!!!
+char *change_extension(char *filename, const char *extension) {
 
   char *lastDot = strrchr(filename, '.');
   long int index = lastDot - filename + 1; // to start after the dot

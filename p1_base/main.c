@@ -34,7 +34,7 @@ void* processCommand(void* arg) {
   int fileDescriptorOut = threadData->fileDescriptorOut;
   int max_threads = threadData->max_threads;
   int vector_position = threadData->vector_position;
-  WaitListNode *wait_vector = threadData->wait_vector;
+  WaitList *wait_vector = threadData->wait_vector;
 
   int endOfFile = 1;
 
@@ -55,7 +55,7 @@ void* processCommand(void* arg) {
       pthread_mutex_unlock(&mutex_wait);
     }
 
-     pthread_mutex_lock(&mutex_command);
+    pthread_mutex_lock(&mutex_command);
 
     switch (get_next(fileDescriptorIn)) {
       
@@ -177,7 +177,8 @@ void* processCommand(void* arg) {
 
 int createThreads(ThreadData* threads[], int max_threads, int fileDescriptorIn, int fileDescriptorOut) {
 
-  WaitListNode *wait_vector = (WaitListNode *)malloc((size_t)max_threads*sizeof(WaitListNode));
+  // Creates a vector and each position is a linked list
+  WaitList *wait_vector = (WaitList *)malloc((size_t)max_threads*sizeof(WaitList));
   if (wait_vector == NULL) 
     fprintf(stderr, "Failed to allocate memory\n");
 
@@ -333,8 +334,6 @@ int main(int argc, char *argv[]) {
       }
       continue;
     }
-
-    printf("File name: %s\n", dp->d_name);
 
     ThreadData* threads[max_threads];
     int fileExecuted = 1;

@@ -12,10 +12,11 @@ struct WaitOrder {
   WaitOrder* next;
 };
 
+// Linked list structure
 typedef struct{
-  WaitOrder* first;
-  WaitOrder* last;
-} WaitListNode;
+  WaitOrder* first;         // Head of the list
+  WaitOrder* last;          // Tail of the list
+} WaitList;
 
 typedef struct {
   pthread_t threadId;
@@ -23,7 +24,7 @@ typedef struct {
   int fileDescriptorOut;
   int vector_position;
   int max_threads;
-  WaitListNode *wait_vector;
+  WaitList *wait_vector;
 } ThreadData;
 
 
@@ -50,7 +51,10 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols);
 /// @return 0 if the reservation was created successfully, 1 otherwise.
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys);
 
-//Com
+/// Sorts the seats in ascending order
+/// @param x Array of rows of the seats to reserve.
+/// @param y Array of columns of the seats to reserve.
+/// @param num_seats Number of seats to reserve.
 void sort_seats(size_t x[], size_t y[], size_t num_seats);
 
 /// Prints the given event.
@@ -73,6 +77,6 @@ void ems_wait(unsigned int delay_ms);
 /// @param delay Delay in milliseconds.
 /// @param index Index
 /// @param rwl_wait The lock for the command
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index,pthread_mutex_t rwl_wait );
+void addWaitOrder(WaitList* wait_vector, unsigned int delay, unsigned int index,pthread_mutex_t rwl_wait );
 
 #endif  // EMS_OPERATIONS_H

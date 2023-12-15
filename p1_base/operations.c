@@ -99,6 +99,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
   event->cols = num_cols;
   event->reservations = 0;
   event->data = malloc(num_rows * num_cols * sizeof(struct Seat));
+  pthread_rwlock_init(&event->lock, NULL);
 
   if (event->data == NULL) {
     fprintf(stderr, "Error allocating memory for event data\n");
@@ -123,6 +124,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
       pthread_rwlock_destroy(&event->data[i].lock);
       free(event->data[i].reservation_id);
     }
+    pthread_rwlock_destroy(&event->lock);
     free(event->data);
     free(event);
     pthread_rwlock_unlock(&rwl_create);
@@ -165,20 +167,26 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
   }
 
   sort_seats(xs, ys, num_seats);
-
   struct Seat* reservation_seats[num_seats];
+
+  pthread_rwlock_rdlock(&event->lock);
+  size_t nr_rows = event->rows;
+  size_t nr_cols = event->cols;
+  pthread_rwlock_unlock(&event->lock);
 
   size_t i = 0;
   for (; i < num_seats; i++) {
     size_t row = xs[i];
     size_t col = ys[i];
 
-    if (row <= 0 || row > event->rows || col <= 0 || col > event->cols) {
+    if (row <= 0 || row > nr_rows || col <= 0 || col > nr_cols) {
       fprintf(stderr, "Invalid seat\n");
       break;
     }
 
+    pthread_rwlock_rdlock(&event->lock);
     struct Seat* seat = get_seat_with_delay(event, seat_index(event, row, col));
+    pthread_rwlock_unlock(&event->lock);
 
     pthread_rwlock_wrlock(&seat->lock);
 
@@ -201,14 +209,13 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
   }
 
   i = 0;
+  pthread_rwlock_wrlock(&event->lock);                            // ---> isto está bem? E podemos mudar para mutex né, nunca fazemos read
   unsigned int reservation_id = ++event->reservations;
-  for (; i < num_seats; i++) {
-    size_t row = xs[i];
-    size_t col = ys[i];
-    struct Seat* seat = get_seat_with_delay(event, seat_index(event, row, col));
-    *reservation_seats[i]->reservation_id=reservation_id;
+  pthread_rwlock_unlock(&event->lock);
 
-    pthread_rwlock_unlock(&seat->lock);
+  for (; i < num_seats; i++) {
+    *reservation_seats[i]->reservation_id=reservation_id;
+    pthread_rwlock_unlock(&reservation_seats[i]->lock);
   }
 
   return 0;
@@ -227,20 +234,17 @@ int ems_show(int fdOut, unsigned int event_id) {
     return 1;
   }
 
-  size_t row_size = event->cols; // pôr comentário ...
-  unsigned int *row = (unsigned int*)malloc(row_size * sizeof(unsigned int));
+  size_t nr_cols = event->cols; // To get the number of seats in a row
+  unsigned int *row = (unsigned int*)malloc(nr_cols * sizeof(unsigned int));
 
   if (row == NULL) {
     fprintf(stderr, "Memory allocation for row failed\n");
     return 1;
   }
 
-  //pthread_rwlock_rdlock(&event->lock_event);
-
-  char *char_buffer = (char *)malloc((event->rows * row_size * (UNS_INT_SIZE + 1) + 1 )* sizeof(char));
+  char *char_buffer = (char *)malloc((event->rows * nr_cols * (UNS_INT_SIZE + 1) + 1 )* sizeof(char));
   if (char_buffer == NULL) {
     fprintf(stderr, "Memory allocation for char_buffer failed\n");
-    //pthread_rwlock_unlock(&event->lock_event);
     return 1;
   }
   char_buffer[0]=0;
@@ -252,7 +256,7 @@ int ems_show(int fdOut, unsigned int event_id) {
       pthread_rwlock_rdlock(&seat->lock);
       row[k++] = *seat->reservation_id;
     }
-    char *buffer = buffer_to_string(row, row_size, SHOW_KEY);
+    char *buffer = buffer_to_string(row, nr_cols, SHOW_KEY);
     strcat(char_buffer,buffer);
     free(buffer);
   }
@@ -265,7 +269,6 @@ int ems_show(int fdOut, unsigned int event_id) {
     }
   }
 
-  //pthread_rwlock_unlock(&event->lock_event);
   write_inFile(fdOut, char_buffer);
   free(row);
   free(char_buffer);
@@ -285,6 +288,7 @@ int ems_list_events(int fdOut) {
   }
   
   pthread_rwlock_rdlock(&rwl_create);
+  // 8 is to allocate enough memory for the string "Event: " plus the "\n"
   char* buffer_list=(char*)malloc((event_list->total_events*(8+UNS_INT_SIZE)+1)*sizeof(char));
   if (buffer_list == NULL) {
     fprintf(stderr, "Memory allocation for buffer_list failed\n");
@@ -297,6 +301,11 @@ int ems_list_events(int fdOut) {
   while (current != NULL) {
     strcat(buffer_list, "Event: ");
     unsigned int *event_ID = (unsigned int*)malloc(sizeof(unsigned int) + 1);
+    if (event_ID == NULL) {
+      fprintf(stderr, "Memory allocation for event_ID failed\n");
+      pthread_rwlock_unlock(&rwl_create);
+      return 1;
+    }
     event_ID[0] = (current->event)->id;
     char *buffer = buffer_to_string(event_ID, 1, LIST_KEY);
     strcat(buffer_list,buffer);
@@ -317,10 +326,11 @@ void ems_wait(unsigned int delay_ms) {
 }
 
 
-void addWaitOrder(WaitListNode* wait_vector, unsigned int delay, unsigned int index, pthread_mutex_t mutex ) {
+void addWaitOrder(WaitList* wait_vector, unsigned int delay, unsigned int index, pthread_mutex_t mutex ) {
   WaitOrder *wait = (WaitOrder*)malloc(sizeof(WaitOrder));
-  if (wait_vector == NULL) {
-    fprintf(stderr, "Failed to allocate memory\n");
+  if (wait == NULL) {
+    fprintf(stderr, "Failed to allocate memory for a Wait Order\n");
+    return;
   }
 
   wait->delay = delay;
