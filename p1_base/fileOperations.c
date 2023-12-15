@@ -12,11 +12,6 @@
 #include "operations.h"
 
 
-// Dúvidas:
-
-// - Computadores dos labs testando com os testes dos stores
-
-
 pthread_mutex_t mutex_write = PTHREAD_MUTEX_INITIALIZER;
 
 int has_extension(const char *filename, const char *extension) {

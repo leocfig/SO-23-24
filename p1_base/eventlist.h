@@ -17,7 +17,7 @@ struct Event {
   size_t rows;                   /// Number of rows.
 
   struct Seat* data;             /// Array of size rows * cols with the seats.
-  pthread_rwlock_t lock;         /// Read-write lock for the event
+  pthread_mutex_t lock;         /// Read-write lock for the event
 };
 
 struct ListNode {

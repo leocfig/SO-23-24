@@ -42,7 +42,7 @@ static void free_event(struct Event* event) {
     free(event->data[i].reservation_id);
   }
 
-  pthread_rwlock_destroy(&event->lock);
+  pthread_mutex_destroy(&event->lock);
   free(event->data);
   free(event);
 }
