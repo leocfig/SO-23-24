@@ -86,6 +86,7 @@ int ems_create(unsigned int event_id, size_t num_rows, size_t num_cols) {
 
   if (get_event_with_delay(event_id) != NULL) {
     fprintf(stderr, "Event already exists\n");
+    pthread_rwlock_unlock(&rwl_create);
     return 1;
   }
 
@@ -159,6 +160,7 @@ void sort_seats(size_t x[], size_t y[], size_t num_seats) {
 }
 
 int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys) {
+
   if (event_list == NULL) {
     fprintf(stderr, "EMS state must be initialized\n");
     return 1;
@@ -209,7 +211,7 @@ int ems_reserve(unsigned int event_id, size_t num_seats, size_t *xs, size_t *ys)
   }
 
   i = 0;
-  pthread_rwlock_wrlock(&event->lock);                            // ---> isto está bem? E podemos mudar para mutex né, nunca fazemos read
+  pthread_rwlock_wrlock(&event->lock);                            
   unsigned int reservation_id = ++event->reservations;
   pthread_rwlock_unlock(&event->lock);
 
