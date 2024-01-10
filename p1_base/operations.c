@@ -331,5 +331,3 @@ void ems_wait(unsigned int delay_ms) {
   nanosleep(&delay, NULL);
 }
 
-
-
