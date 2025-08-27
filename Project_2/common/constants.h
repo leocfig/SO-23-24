@@ -1,0 +1,28 @@
+#ifndef COMMON_CONSTANTS_H
+#define COMMON_CONSTANTS_H
+
+
+
+#define MAX_RESERVATION_SIZE 256
+#define STATE_ACCESS_DELAY_US 500000  // 500ms
+#define MAX_JOB_FILE_NAME_SIZE 256
+#define MAX_SESSION_COUNT 8             // Mudar de volta para 8
+#define MAX_FIFO_PATHNAME 40
+#define SHOW_KEY 1
+#define LIST_KEY 2
+#define UNS_INT_SIZE 10
+#define STDOUT 1
+#define SIGNAL_DETECTED 2
+#define PIPE_CLOSED 3
+
+enum OP_CODE {
+  SETUP = 1,
+  QUIT,
+  CREATE,
+  RESERVE,
+  SHOW,
+  LIST_EVENTS,
+};
+
+
+#endif  // COMMON_CONSTANTS_H
